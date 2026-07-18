@@ -1,0 +1,32 @@
+TEAM TASK TRACKER — DEPLOYMENT CHECKLIST
+
+1) SUPABASE
+- Create a Supabase project.
+- SQL Editor → paste all of supabase-schema.sql → Run.
+- Project Settings / API → copy Project URL.
+- Copy the server secret key (or legacy service_role key).
+
+2) VERCEL
+- Upload this folder to a GitHub repository.
+- Import that repository in Vercel.
+- Add Environment Variables:
+  SUPABASE_URL
+  SUPABASE_SERVICE_ROLE_KEY
+  JWT_SECRET
+- Redeploy.
+
+3) FIRST LOGIN
+Employee ID: OWNER
+PIN: 0000
+Change the PIN in Owner Settings immediately.
+
+4) GOOGLE SHEETS
+- Create a Google Sheet.
+- Extensions → Apps Script.
+- Paste google-apps-script/Code.gs.
+- Deploy → New deployment → Web app.
+- Execute as Me; access Anyone.
+- Paste the /exec URL in Owner Settings → Google Sheets.
+- Click Test Connection.
+
+After these four steps, all locations/devices use the same Supabase data and every task/attendance/Finish Day update syncs to Google Sheets.
