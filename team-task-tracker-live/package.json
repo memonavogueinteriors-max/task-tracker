@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
-    "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2"
+    "@supabase/supabase-js": "2.110.7",
+    "bcryptjs": "3.0.3",
+    "jsonwebtoken": "9.0.2"
   }
 }
