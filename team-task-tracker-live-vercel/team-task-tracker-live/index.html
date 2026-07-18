@@ -69,9 +69,12 @@ const state = {
   token: localStorage.getItem('tt_live_token') || '',
   user: null, company: null, members: [], tasks: [], attendance: [], notifications: [],
   tab: 'work', workDate: localDate(), recordMember: 'all', taskFilterMember: 'all', taskFilterStatus: 'all',
-  modal: null, editingTask: null, editingMember: null, notificationsOpen: false, busy: false
+  modal: null, editingTask: null, editingMember: null, notificationsOpen: false,
+  busy: false, formDirty: false
 };
 let pollTimer = null;
+let bootstrapSequence = 0;
+let lastUserActivityAt = 0;
 
 function localDate(date = new Date()) {
   const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
@@ -93,6 +96,57 @@ function visibleMembers(){ return state.members; }
 function canManageTeam(){ return isOwner()||isManager(); }
 function allowedAssignees(){ return canManageTeam()?state.members:state.members.filter(m=>m.id===state.user.id); }
 function unreadCount(){return state.notifications.filter(n=>!n.readAt).length;}
+
+function activeFormControl() {
+  const el = document.activeElement;
+  return Boolean(
+    el &&
+    (
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      el.isContentEditable
+    )
+  );
+}
+
+function userIsEditing() {
+  return Boolean(
+    state.modal ||
+    state.formDirty ||
+    activeFormControl() ||
+    Date.now() - lastUserActivityAt < 2000
+  );
+}
+
+function markUserActivity() {
+  lastUserActivityAt = Date.now();
+}
+
+document.addEventListener('focusin', markUserActivity, true);
+document.addEventListener('keydown', markUserActivity, true);
+document.addEventListener('pointerdown', markUserActivity, true);
+document.addEventListener('input', event => {
+  markUserActivity();
+  const el = event.target;
+  if (
+    el &&
+    el.closest?.('#root') &&
+    (
+      el.closest?.('form') ||
+      el.id === 'loginTime' ||
+      el.id === 'logoutTime'
+    ) &&
+    (
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      el.isContentEditable
+    )
+  ) {
+    state.formDirty = true;
+  }
+}, true);
 
 async function api(action, options={}) {
   const method = options.method || 'GET';
@@ -135,46 +189,62 @@ async function login(event){
 }
 function logout(confirmFirst=true){
   if(confirmFirst&&!confirm('Sign out?'))return;
-  state.token='';state.user=null;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
+  state.token='';state.user=null;state.formDirty=false;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
 }
-async function loadData(show=true){
+async function loadData(show=true, options={}){
   if(!state.token)return renderLogin();
+
+  const background = Boolean(options.background);
+
+  if(background && (document.hidden || state.busy || userIsEditing())){
+    return;
+  }
+
+  const requestId = ++bootstrapSequence;
+
   try{
-    const data=await api('bootstrap');
-    Object.assign(state,{user:data.user,company:data.company,members:data.members,tasks:data.tasks,attendance:data.attendance,notifications:data.notifications});
-    setBrand(); renderApp();
-  }catch(e){ if(show)toast(e.message,'err'); }
-}
-function startPolling(){function userIsEditing() {
-  const el = document.activeElement;
+    const data = await api('bootstrap');
 
-  return Boolean(
-    state.modal ||
-    (
-      el &&
-      (
-        el.tagName === 'INPUT' ||
-        el.tagName === 'TEXTAREA' ||
-        el.tagName === 'SELECT' ||
-        el.isContentEditable
-      )
-    )
-  );
+    if(requestId !== bootstrapSequence){
+      return;
+    }
+
+    Object.assign(state,{
+      user:data.user,
+      company:data.company,
+      members:data.members,
+      tasks:data.tasks,
+      attendance:data.attendance,
+      notifications:data.notifications
+    });
+
+    setBrand();
+
+    if(background && (document.hidden || state.busy || userIsEditing())){
+      return;
+    }
+
+    if(!background){
+      state.formDirty = false;
+    }
+
+    renderApp();
+  }catch(e){
+    if(show)toast(e.message,'err');
+  }
 }
 
-function startPolling() {
+function startPolling(){
   clearInterval(pollTimer);
 
   pollTimer = setInterval(() => {
-    if (
-      state.token &&
-      !state.busy &&
-      !userIsEditing()
-    ) {
-      loadData(false);
+    if(!state.token || state.busy || document.hidden || userIsEditing()){
+      return;
     }
-  }, 15000);
-}clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
+
+    void loadData(false,{background:true});
+  },15000);
+}
 
 function renderLogin(){
   const c=state.company||{name:'Team Task Tracker',tagline:'Shared team productivity portal'};setBrand();
@@ -208,7 +278,7 @@ function renderApp(){
     <main class="content">${renderCurrentTab()}</main></div></div>
     ${state.notificationsOpen?renderNotifications():''}${renderModal()}`;
 }
-function goTab(tab){state.tab=tab;state.modal=null;state.notificationsOpen=false;renderApp();}
+function goTab(tab){state.formDirty=false;state.tab=tab;state.modal=null;state.notificationsOpen=false;renderApp();}
 function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();return renderWork();}
 
 function renderWork(){
@@ -226,7 +296,7 @@ function renderWork(){
     <section class="card"><div class="card-head"><div><h3>Tasks for ${esc(formatDate(date))}</h3><p>${mine.length} task(s), ${totalHours.toFixed(1)} total hour(s)</p></div></div>${renderTaskTable(mine,true)}</section>
     ${attendance?.finishedAt?renderOneDayBlock(state.user.id,date):''}`;
 }
-function changeWorkDate(value){state.workDate=value||localDate();renderApp();}
+function changeWorkDate(value){state.formDirty=false;state.workDate=value||localDate();renderApp();}
 
 function renderAddTaskCard(){
   const assignees=allowedAssignees();
@@ -259,7 +329,7 @@ function renderTaskTable(tasks,own=false){
   return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${Number(t.hours).toFixed(2)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
-function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
+function openEditTask(id){state.formDirty=false;state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
 async function updateTask(event){event.preventDefault();const f=new FormData(event.target);try{await api('task.update',{method:'PATCH',body:{id:state.editingTask.id,title:f.get('title'),taskDate:f.get('taskDate'),hours:Number(f.get('hours')),status:f.get('status'),notes:f.get('notes')}});state.modal=null;toast('Task updated and Sheet row refreshed.');await loadData(false);}catch(e){toast(e.message,'err')}}
 
 function renderTeam(){
@@ -268,8 +338,8 @@ function renderTeam(){
     <section class="grid stats"><div class="stat"><div class="label">Visible Members</div><div class="value">${state.members.length}</div><div class="meta">Including your account</div></div><div class="stat"><div class="label">Managers</div><div class="value">${state.members.filter(m=>m.role==='manager').length}</div><div class="meta">Active managers</div></div><div class="stat"><div class="label">Sales Members</div><div class="value">${state.members.filter(m=>m.role==='sales').length}</div><div class="meta">Active team members</div></div><div class="stat"><div class="label">Tasks</div><div class="value">${state.tasks.length}</div><div class="meta">Visible task records</div></div></section>
     <section class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Member</th><th>Employee ID</th><th>Role</th><th>Reports To</th><th>Tasks</th><th>Hours</th><th>Completion</th><th>Actions</th></tr></thead><tbody>${state.members.map(m=>{const mt=state.tasks.filter(t=>t.memberId===m.id),done=mt.filter(t=>t.status==='Completed').length,hours=mt.reduce((s,t)=>s+Number(t.hours||0),0),manager=memberById(m.managerId);return `<tr><td><strong>${esc(m.name)}</strong><br><small>${esc(m.email||'No email')}</small></td><td><strong>${esc(m.employeeId)}</strong></td><td>${rolePill(m.role)}</td><td>${esc(manager?.name||'—')}</td><td>${mt.length}</td><td>${hours.toFixed(1)}</td><td>${mt.length?Math.round(done/mt.length*100):0}%</td><td><div class="actions">${m.id!==state.user.id?`<button class="btn btn-light btn-sm" onclick="quickAssign('${m.id}')">Assign Task</button><button class="btn btn-light btn-sm" onclick="ringMember('${m.id}')">Ring</button>${isOwner()?`<button class="btn btn-danger btn-sm" onclick="openEditMember('${m.id}')">Manage</button>`:''}`:'Current user'}</div></td></tr>`}).join('')}</tbody></table></div></section>`;
 }
-function openAddMember(){state.editingMember=null;state.modal='member';renderApp();}
-function openEditMember(id){state.editingMember=state.members.find(m=>m.id===id);state.modal='memberEdit';renderApp();}
+function openAddMember(){state.formDirty=false;state.editingMember=null;state.modal='member';renderApp();}
+function openEditMember(id){state.formDirty=false;state.editingMember=state.members.find(m=>m.id===id);state.modal='memberEdit';renderApp();}
 async function createMember(event){event.preventDefault();const f=new FormData(event.target);try{const data=await api('member.create',{method:'POST',body:{name:f.get('name'),email:f.get('email'),role:f.get('role'),employeeId:f.get('employeeId'),pin:f.get('pin'),managerId:f.get('managerId')}});state.modal=null;toast(`Member created: ${data.member.employeeId}`);await loadData(false);}catch(e){toast(e.message,'err')}}
 async function updateMember(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.update',{method:'PATCH',body:{id:state.editingMember.id,name:f.get('name'),email:f.get('email'),managerId:f.get('managerId'),pin:f.get('pin'),active:f.get('active')==='on'}});state.modal=null;toast('Member updated.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function quickAssign(memberId){state.tab='work';renderApp();setTimeout(()=>{const select=document.querySelector('select[name=memberId]');if(select)select.value=memberId;document.querySelector('input[name=title]')?.focus();},0)}
@@ -307,21 +377,21 @@ function renderSettings(){
       <section class="card"><div class="card-head"><div><h3>🌍 Multi-Device Status</h3><p>This live version does not use localStorage for business data.</p></div></div><div class="success">✓ Members, tasks, attendance, finished days, notifications, and branding are stored in Supabase and shared across locations.</div><div class="notice">Vercel Environment Variables must remain configured. Never expose the Supabase secret key in this HTML.</div></section>
     </div></section>`;
 }
-function previewLogo(input){const file=input.files?.[0];if(!file)return;if(file.size>650000)return toast('Logo must be smaller than about 650 KB.','err');const reader=new FileReader();reader.onload=()=>{document.getElementById('logoDataUrl').value=reader.result;toast('Logo selected. Click Save Company Settings.');};reader.readAsDataURL(file)}
-function clearLogo(){document.getElementById('logoDataUrl').value='';toast('Logo removed from form. Click Save Company Settings.');}
+function previewLogo(input){const file=input.files?.[0];if(!file)return;if(file.size>650000)return toast('Logo must be smaller than about 650 KB.','err');const reader=new FileReader();reader.onload=()=>{document.getElementById('logoDataUrl').value=reader.result;state.formDirty=true;toast('Logo selected. Click Save Company Settings.');};reader.readAsDataURL(file)}
+function clearLogo(){document.getElementById('logoDataUrl').value='';state.formDirty=true;toast('Logo removed from form. Click Save Company Settings.');}
 async function saveCompany(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{name:f.get('name'),tagline:f.get('tagline'),primaryColor:f.get('primaryColor'),headerColor:f.get('headerColor'),headerColor2:f.get('headerColor2'),logoDataUrl:f.get('logoDataUrl')}});toast('Company branding saved for all devices.');await loadData(false);}catch(e){toast(e.message,'err')}}
 async function saveSheet(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{sheetWebhookUrl:f.get('sheetWebhookUrl')}});toast('Google Sheets URL saved.');await loadData(false);}catch(e){toast(e.message,'err')}}
 async function testSheet(){try{await api('sheet.test',{method:'POST',body:{}});toast('Google Sheet connection is working.');}catch(e){toast(e.message,'err')}}
-async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
+async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();state.formDirty=false;toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
 
 function toggleNotifications(){state.notificationsOpen=!state.notificationsOpen;renderApp();if(state.notificationsOpen&&unreadCount())markNotificationsRead();}
 function renderNotifications(){return `<aside class="notification-panel"><div class="np-head"><strong>Notifications</strong><button class="btn btn-light btn-sm" onclick="markNotificationsRead()">Mark all read</button></div>${state.notifications.length?state.notifications.map(n=>`<div class="notif ${n.readAt?'':'unread'}"><strong>${n.type==='ring'?'🔔':n.type==='task'?'📋':'ℹ️'} ${esc(n.message)}</strong><time>${esc(formatDateTime(n.createdAt))}</time></div>`).join(''):`<div class="empty">No notifications.</div>`}</aside>`}
 async function markNotificationsRead(){try{await api('notifications.read',{method:'POST',body:{ids:state.notifications.filter(n=>!n.readAt).map(n=>n.id)}});state.notifications.forEach(n=>n.readAt=n.readAt||new Date().toISOString());renderApp();}catch(e){toast(e.message,'err')}}
-function openRing(){state.modal='ring';renderApp();}
-function ringMember(id){state.modal='ring';state.ringRecipient=id;renderApp();}
-async function sendRing(event){event.preventDefault();const f=new FormData(event.target);try{await api('ring',{method:'POST',body:{recipientId:f.get('recipientId'),message:f.get('message')}});state.modal=null;state.ringRecipient=null;toast('Ring sent.');renderApp();}catch(e){toast(e.message,'err')}}
+function openRing(){state.formDirty=false;state.modal='ring';renderApp();}
+function ringMember(id){state.formDirty=false;state.modal='ring';state.ringRecipient=id;renderApp();}
+async function sendRing(event){event.preventDefault();const f=new FormData(event.target);try{await api('ring',{method:'POST',body:{recipientId:f.get('recipientId'),message:f.get('message')}});state.modal=null;state.ringRecipient=null;state.formDirty=false;toast('Ring sent.');renderApp();}catch(e){toast(e.message,'err')}}
 
-function closeModal(){state.modal=null;state.editingTask=null;state.editingMember=null;state.ringRecipient=null;renderApp();}
+function closeModal(){state.formDirty=false;state.modal=null;state.editingTask=null;state.editingMember=null;state.ringRecipient=null;renderApp();}
 function renderModal(){
   if(!state.modal)return '';
   if(state.modal==='task'){const t=state.editingTask;return modalWrap('Edit Task',`<form onsubmit="updateTask(event)"><div class="field"><label>Task Name</label><input name="title" value="${esc(t.title)}" required></div><div class="form-grid"><div class="field"><label>Date</label><input name="taskDate" type="date" value="${esc(t.taskDate)}" required></div><div class="field"><label>Hours</label><input name="hours" type="number" min="0" max="24" step=".25" value="${esc(t.hours)}" required></div><div class="field"><label>Status</label><select name="status">${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`<option ${t.status===s?'selected':''}>${s}</option>`).join('')}</select></div></div><div class="field"><label>Notes</label><textarea name="notes">${esc(t.notes||'')}</textarea></div><div class="actions"><button class="btn btn-light" type="button" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Save Changes</button></div></form>`)}
@@ -332,7 +402,24 @@ function renderModal(){
 }
 function modalWrap(title,body){return `<div class="modal-back" onclick="if(event.target===this)closeModal()"><section class="modal"><div class="modal-head"><h3>${title}</h3><button class="close" onclick="closeModal()">×</button></div>${body}</section></div>`}
 
-window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await loadData();startPolling();}catch{renderLogin();}}else renderLogin();});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && state.token && !state.busy && !userIsEditing()){
+    void loadData(false,{background:true});
+  }
+});
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  if(state.token){
+    try{
+      await loadData();
+      startPolling();
+    }catch{
+      renderLogin();
+    }
+  }else{
+    renderLogin();
+  }
+});
 </script>
 </body>
 </html>
