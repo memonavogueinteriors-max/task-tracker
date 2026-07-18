@@ -145,7 +145,36 @@ async function loadData(show=true){
     setBrand(); renderApp();
   }catch(e){ if(show)toast(e.message,'err'); }
 }
-function startPolling(){clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
+function startPolling(){function userIsEditing() {
+  const el = document.activeElement;
+
+  return Boolean(
+    state.modal ||
+    (
+      el &&
+      (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      )
+    )
+  );
+}
+
+function startPolling() {
+  clearInterval(pollTimer);
+
+  pollTimer = setInterval(() => {
+    if (
+      state.token &&
+      !state.busy &&
+      !userIsEditing()
+    ) {
+      loadData(false);
+    }
+  }, 15000);
+}clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
 
 function renderLogin(){
   const c=state.company||{name:'Team Task Tracker',tagline:'Shared team productivity portal'};setBrand();
