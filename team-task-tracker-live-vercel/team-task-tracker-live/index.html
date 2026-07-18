@@ -187,14 +187,37 @@ async function login(event){
   }catch(e){error.innerHTML=`<div class="error">${esc(e.message)}</div>`;}
   finally{btn.disabled=false;btn.textContent='Sign In →';}
 }
-function logout(confirmFirst=true){
+function logout(confirmFirst=false){
   if(confirmFirst&&!confirm('Sign out?'))return;
-  state.token='';state.user=null;state.formDirty=false;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
+
+  // Invalidate any bootstrap request that may still be running so it
+  // cannot redraw the dashboard after the user has signed out.
+  bootstrapSequence++;
+  clearInterval(pollTimer);
+  pollTimer=null;
+
+  state.token='';
+  state.user=null;
+  state.company=null;
+  state.members=[];
+  state.tasks=[];
+  state.attendance=[];
+  state.notifications=[];
+  state.modal=null;
+  state.editingTask=null;
+  state.editingMember=null;
+  state.notificationsOpen=false;
+  state.busy=false;
+  state.formDirty=false;
+
+  localStorage.removeItem('tt_live_token');
+  renderLogin();
 }
 async function loadData(show=true, options={}){
   if(!state.token)return renderLogin();
 
   const background = Boolean(options.background);
+  const sessionToken = state.token;
 
   if(background && (document.hidden || state.busy || userIsEditing())){
     return;
@@ -205,7 +228,13 @@ async function loadData(show=true, options={}){
   try{
     const data = await api('bootstrap');
 
-    if(requestId !== bootstrapSequence){
+    // Do not apply a response from an older request or a session that
+    // has already been signed out/replaced.
+    if(
+      requestId !== bootstrapSequence ||
+      !state.token ||
+      state.token !== sessionToken
+    ){
       return;
     }
 
@@ -253,11 +282,10 @@ function renderLogin(){
       <div class="brand">${brandLogo()}<div><h1>${esc(c.name||'Team Task Tracker')}</h1><p>${esc(c.tagline||'Shared team productivity portal')}</p></div></div>
       <h2>Welcome back 👋</h2><p class="sub">Sign in with the Employee ID and PIN given by your Owner.</p>
       <form onsubmit="login(event)">
-        <div class="field"><label>Employee ID</label><input name="employeeId" autocomplete="username" placeholder="OWNER or EMP-001" required></div>
-        <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="current-password" placeholder="4–8 digits" required></div>
+        <div class="field"><label>Employee ID</label><input name="employeeId" autocomplete="username" placeholder="Enter your Employee ID" required></div>
+        <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="current-password" placeholder="Enter your PIN" required></div>
         <div id="loginError"></div><button class="btn btn-dark full" type="submit">Sign In →</button>
       </form>
-      <p class="hint">First Owner login: <strong>OWNER</strong> / <strong>0000</strong></p>
     </section></main>`;
 }
 
