@@ -1,0 +1,37 @@
+TASK TRACKER 1-3-5 + EMAIL UPGRADE
+
+1. SUPABASE
+   SQL Editor -> New query
+   Run: supabase-migration-1-3-5.sql
+
+2. GITHUB
+   Replace these files in your Vercel Root Directory:
+   - index.html
+   - api/index.js
+   - google-apps-script/Code.gs
+   - package.json
+   - vercel.json
+   Also upload supabase-migration-1-3-5.sql for backup.
+
+3. VERCEL ENVIRONMENT VARIABLE
+   Add:
+   APPS_SCRIPT_SHARED_SECRET = a long private random value
+   Enable it for Production, Preview, and Development.
+
+4. GOOGLE APPS SCRIPT
+   Replace Code.gs with the included file.
+   Project Settings -> Script Properties -> Add script property:
+   APPS_SCRIPT_SHARED_SECRET = exactly the same value used in Vercel.
+   Deploy -> Manage deployments -> Edit -> New version -> Deploy.
+   Execute as: Me. Access: Anyone.
+
+5. OWNER SETTINGS
+   Save the Apps Script /exec URL.
+   Save the Owner notification email.
+   Click Test Connection.
+   Click Send Test Email.
+
+6. TEST
+   Owner assigns a task to a member -> member receives email.
+   Sales/Developer creates a task -> Owner receives email.
+   Operational Manager assigns a task -> member and Owner receive emails.
