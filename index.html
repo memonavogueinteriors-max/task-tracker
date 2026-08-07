@@ -199,20 +199,226 @@ function renderWork(){
 }
 function changeWorkDate(value){state.workDate=value||localDate();renderApp();}
 
-function renderAddTaskCard(){
-  const assignees=allowedAssignees();
-  return `<section class="card"><div class="card-head"><div><h3>➕ ${canManageTeam()?'Add or Assign Task':'Add Task'}</h3><p>Every saved task is sent to the shared database and Google Sheet.</p></div></div>
-    <form class="form-grid" onsubmit="createTask(event)">
-      ${canManageTeam()?`<div class="field"><label>Assign To</label><select name="memberId" required>${assignees.map(m=>`<option value="${m.id}" ${m.id===state.user.id?'selected':''}>${esc(m.name)} — ${esc(m.employeeId)}</option>`).join('')}</select></div>`:`<input type="hidden" name="memberId" value="${state.user.id}">`}
-      <div class="field wide"><label>Task Name</label><input name="title" placeholder="e.g. Follow up with client" required></div>
-      <div class="field"><label>Date</label><input name="taskDate" type="date" value="${esc(state.workDate)}" required></div>
-      <div class="field"><label>Hours Taken</label><input name="hours" type="number" min="0" max="24" step="0.25" value="1" required></div>
-      <div class="field"><label>Status</label><select name="status">${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`<option>${s}</option>`).join('')}</select></div>
-      <div class="field wide"><label>Notes</label><input name="notes" placeholder="Optional details"></div>
-      <div class="field" style="justify-content:end"><label>&nbsp;</label><button class="btn btn-primary" type="submit">Save Task</button></div>
-    </form></section>`;
+let huddleRows = {
+  priority: 'High',
+  rows: []
+};
+
+function huddleConfig(priority){
+  if(priority==='High'){
+    return {min:1,max:1,minTime:4,maxTime:6};
+  }
+  if(priority==='Medium'){
+    return {min:3,max:4,minTime:0.5,maxTime:0.75};
+  }
+  return {min:5,max:7,minTime:0.25,maxTime:0.33};
 }
+
+function changeHuddlePriority(value){
+  huddleRows.priority=value;
+  const config=huddleConfig(value);
+
+  huddleRows.rows=[];
+
+  for(let i=0;i<config.min;i++){
+    huddleRows.rows.push({
+      title:'',
+      hours: value==='High'?4:value==='Medium'?0.5:0.25
+    });
+  }
+
+  renderApp();
+}
+
+function addHuddleRow(){
+  const config=huddleConfig(huddleRows.priority);
+
+  if(huddleRows.rows.length>=config.max){
+    return toast(`Maximum ${config.max} ${huddleRows.priority} tasks allowed.`,'err');
+  }
+
+  huddleRows.rows.push({
+    title:'',
+    hours:huddleRows.priority==='High'?4:huddleRows.priority==='Medium'?0.5:0.25
+  });
+
+  renderApp();
+}
+
+
+function renderAddTaskCard(){
+
+const config=huddleConfig(huddleRows.priority);
+
+if(!huddleRows.rows.length){
+  for(let i=0;i<config.min;i++){
+    huddleRows.rows.push({
+      title:'',
+      hours:huddleRows.priority==='High'?4:huddleRows.priority==='Medium'?0.5:0.25
+    });
+  }
+}
+
+return `
+<section class="card">
+
+<div class="card-head">
+<h3>➕ Morning Huddle 1-3-5</h3>
+<p>Create High, Medium and Low priority tasks.</p>
+</div>
+
+
+<div class="field">
+<label>Priority</label>
+
+<select onchange="changeHuddlePriority(this.value)">
+<option ${huddleRows.priority==='High'?'selected':''}>High</option>
+<option ${huddleRows.priority==='Medium'?'selected':''}>Medium</option>
+<option ${huddleRows.priority==='Low'?'selected':''}>Low</option>
+</select>
+
+</div>
+
+
+<form onsubmit="createTask(event)">
+
+${huddleRows.rows.map((r,i)=>`
+
+<div class="card">
+
+<h4>${huddleRows.priority} Task ${i+1}</h4>
+
+<div class="field">
+<label>Task Name</label>
+<input 
+name="title_${i}"
+value="${esc(r.title)}"
+required
+>
+</div>
+
+
+<div class="field">
+
+<label>
+Duration 
+(${huddleRows.priority==='High'?'4-6 hours':huddleRows.priority==='Medium'?'30-45 minutes':'15-20 minutes'})
+</label>
+
+<input 
+type="number"
+step="0.25"
+name="hours_${i}"
+value="${r.hours}"
+required
+>
+
+</div>
+
+</div>
+
+`).join('')}
+
+
+${huddleRows.rows.length>=config.min && huddleRows.rows.length<config.max ?
+
+`<button 
+type="button"
+class="btn btn-light"
+onclick="addHuddleRow()">
++ Add More ${huddleRows.priority} Task
+</button>`:''}
+
+
+<br>
+
+<button class="btn btn-primary">
+Save Huddle Tasks
+</button>
+
+
+</form>
+
+</section>
+`;
+}
+
+
+
 async function createTask(event){
+
+event.preventDefault();
+
+const form=new FormData(event.target);
+
+const config=huddleConfig(huddleRows.priority);
+
+
+if(huddleRows.rows.length<config.min){
+
+return toast(
+`Minimum ${config.min} ${huddleRows.priority} tasks required`,
+'err'
+);
+
+}
+
+
+state.busy=true;
+
+
+try{
+
+for(let i=0;i<huddleRows.rows.length;i++){
+
+let hours=Number(form.get(`hours_${i}`));
+
+if(huddleRows.priority==='High' && (hours<4 || hours>6))
+throw new Error('High task must be between 4 and 6 hours');
+
+if(huddleRows.priority==='Medium' && (hours<0.5 || hours>0.75))
+throw new Error('Medium task must be 30-45 minutes');
+
+if(huddleRows.priority==='Low' && (hours<0.25 || hours>0.33))
+throw new Error('Low task must be 15-20 minutes');
+
+
+await api('task.create',{
+method:'POST',
+body:{
+memberId:state.user.id,
+title:form.get(`title_${i}`),
+taskDate:state.workDate,
+hours,
+priority:huddleRows.priority,
+status:'Pending',
+notes:'Morning Huddle 1-3-5'
+}
+});
+
+}
+
+
+huddleRows.rows=[];
+
+toast('Huddle tasks saved and Sheet sync started.');
+
+await loadData(false);
+
+
+}catch(e){
+
+toast(e.message,'err');
+
+}
+
+finally{
+
+state.busy=false;
+
+}
+
+}async function createTask(event){
   event.preventDefault();const f=new FormData(event.target);state.busy=true;
   try{await api('task.create',{method:'POST',body:{memberId:f.get('memberId'),title:f.get('title'),taskDate:f.get('taskDate'),hours:Number(f.get('hours')),status:f.get('status'),notes:f.get('notes')}});event.target.reset();toast('Task saved and Sheet sync started.');await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
 }
