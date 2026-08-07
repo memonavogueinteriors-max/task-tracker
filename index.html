@@ -216,6 +216,7 @@ function huddleConfig(priority){
 
 function changeHuddlePriority(value){
   huddleRows.priority=value;
+
   const config=huddleConfig(value);
 
   huddleRows.rows=[];
@@ -223,7 +224,7 @@ function changeHuddlePriority(value){
   for(let i=0;i<config.min;i++){
     huddleRows.rows.push({
       title:'',
-      hours: value==='High'?4:value==='Medium'?0.5:0.25
+      hours:value==='High'?4:value==='Medium'?0.5:0.25
     });
   }
 
@@ -293,6 +294,7 @@ ${huddleRows.rows.map((r,i)=>`
 <input 
 name="title_${i}"
 value="${esc(r.title)}"
+oninput="huddleRows.rows[${i}].title=this.value"
 required
 >
 </div>
@@ -310,11 +312,11 @@ type="number"
 step="0.25"
 name="hours_${i}"
 value="${r.hours}"
+oninput="huddleRows.rows[${i}].hours=this.value"
 required
 >
 
 </div>
-
 </div>
 
 `).join('')}
