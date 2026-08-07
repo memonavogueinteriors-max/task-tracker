@@ -427,8 +427,124 @@ state.busy=false;
 }
 
 }async function createTask(event){
-  event.preventDefault();const f=new FormData(event.target);state.busy=true;
-  try{await api('task.create',{method:'POST',body:{memberId:f.get('memberId'),title:f.get('title'),taskDate:f.get('taskDate'),hours:Number(f.get('hours')),status:f.get('status'),notes:f.get('notes')}});event.target.reset();toast('Task saved and Sheet sync started.');await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
+
+event.preventDefault();
+
+const form = new FormData(event.target);
+
+const config = huddleConfig(huddleRows.priority);
+
+
+// sync form values before saving
+huddleRows.rows.forEach((row,i)=>{
+
+const title=form.get(`title_${i}`);
+const hours=form.get(`hours_${i}`);
+
+if(title!==null){
+row.title=String(title).trim();
+}
+
+if(hours!==null){
+row.hours=hours;
+}
+
+});
+
+
+if(huddleRows.rows.length < config.min){
+return toast(
+`Minimum ${config.min} ${huddleRows.priority} tasks required`,
+'err'
+);
+}
+
+
+state.busy=true;
+
+
+try{
+
+
+for(let i=0;i<huddleRows.rows.length;i++){
+
+const row=huddleRows.rows[i];
+
+const title=row.title.trim();
+const hours=Number(row.hours);
+
+
+if(!title){
+throw new Error(`Task ${i+1} name is required`);
+}
+
+
+if(!Number.isFinite(hours)){
+throw new Error(`Task ${i+1} duration is required`);
+}
+
+
+if(
+huddleRows.priority==='High' &&
+(hours<4 || hours>6)
+){
+throw new Error('High task must be between 4 and 6 hours');
+}
+
+
+if(
+huddleRows.priority==='Medium' &&
+(hours<0.5 || hours>0.75)
+){
+throw new Error('Medium task must be 30-45 minutes');
+}
+
+
+if(
+huddleRows.priority==='Low' &&
+(hours<0.25 || hours>0.33)
+){
+throw new Error('Low task must be 15-20 minutes');
+}
+
+
+
+await api('task.create',{
+method:'POST',
+body:{
+memberId:state.user.id,
+title:title,
+taskDate:state.workDate,
+hours:hours,
+priority:huddleRows.priority,
+status:'Pending',
+notes:'Morning Huddle 1-3-5'
+}
+});
+
+
+}
+
+
+huddleRows.rows=[];
+
+toast('Huddle tasks saved and Sheet sync started.');
+
+await loadData(false);
+
+
+}
+catch(e){
+
+toast(e.message,'err');
+
+}
+finally{
+
+state.busy=false;
+
+}
+
 }
 async function saveAttendance(type){
   const input=document.getElementById(type==='login'?'loginTime':'logoutTime'); if(!input?.value)return toast('Select a time first.','err');state.busy=true;
