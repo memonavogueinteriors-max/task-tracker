@@ -56,6 +56,26 @@
     .toast{position:fixed;bottom:20px;right:20px;z-index:200;padding:12px 16px;border-radius:11px;color:#fff;font-weight:800;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.22)}.toast.ok{background:#276749}.toast.err{background:#C53030}
     @media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:760px){.header-inner{padding:10px 12px}.header .brand p,.user-chip div{display:none}.layout{display:block}.sidebar{position:sticky;top:62px;z-index:40;display:flex;overflow:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px;background:#fff}.nav-title{display:none}.nav-btn{width:auto;white-space:nowrap;margin:0 4px;padding:9px 12px}.content{padding:14px}.page-head{align-items:center}.page-head h2{font-size:21px}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:14px}.stat .value{font-size:22px}.form-grid{grid-template-columns:1fr}.form-grid .wide,.form-grid .all{grid-column:auto}.card{padding:14px}.header-actions .btn{display:none}}
+
+    .huddle-card{border-top:4px solid var(--primary)}
+    .huddle-list{display:grid;gap:12px;margin:4px 0 14px}
+    .huddle-row{border:1px solid var(--line);border-radius:14px;padding:15px;background:#FBFCFE}
+    .huddle-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .huddle-row-head strong{font-size:14px}
+    .field-inline{display:flex;align-items:center;gap:8px;margin:0}
+    .field-inline label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;color:#5F6B7A}
+    .field-inline select{border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;background:#fff;color:var(--text)}
+    .optional{font-size:10px;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600}
+    .huddle-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+    .huddle-rule{font-size:11px;color:var(--muted);font-weight:700}
+    @media(max-width:760px){
+      .huddle-row-head{align-items:flex-start;flex-direction:column}
+      .field-inline{width:100%;justify-content:space-between}
+      .field-inline select{flex:1}
+      .huddle-actions{align-items:stretch;flex-direction:column}
+      .huddle-actions .btn{width:100%}
+    }
+
     @media(max-width:430px){.stats{grid-template-columns:1fr}.login-card{padding:25px}.content{padding:10px}.page-head{flex-direction:column}.attendance{align-items:stretch}.attendance .field{width:100%}.attendance .btn{width:100%}}
   </style>
 </head>
@@ -199,353 +219,903 @@ function renderWork(){
 }
 function changeWorkDate(value){state.workDate=value||localDate();renderApp();}
 
+
+/* =========================
+   ADD YOUR TASK
+   DAILY 1-3-5 FLOW
+   ========================= */
+
+const HUDDLE_STAGES = {
+  High: {
+    min: 1,
+    max: 1,
+    durations: [
+      { value: 4, label: '4 hours' },
+      { value: 4.25, label: '4 hours 15 minutes' },
+      { value: 4.5, label: '4 hours 30 minutes' },
+      { value: 5, label: '5 hours' },
+      { value: 5.25, label: '5 hours 15 minutes' },
+      { value: 5.5, label: '5 hours 30 minutes' },
+      { value: 6, label: '6 hours' }
+    ]
+  },
+
+  Medium: {
+    min: 3,
+    max: 5,
+    durations: [
+      { value: 0.5, label: '30 minutes' },
+      { value: 35 / 60, label: '35 minutes' },
+      { value: 40 / 60, label: '40 minutes' }
+    ]
+  },
+
+  Low: {
+    min: 5,
+    max: 7,
+    durations: [
+      { value: 0.25, label: '15 minutes' },
+      { value: 20 / 60, label: '20 minutes' },
+      { value: 25 / 60, label: '25 minutes' }
+    ]
+  }
+};
+
+
 let huddleRows = {
   priority: 'High',
   rows: []
 };
 
-function huddleConfig(priority){
-  if(priority==='High'){
-    return {min:1,max:1,minTime:4,maxTime:6};
-  }
-  if(priority==='Medium'){
-    return {min:3,max:4,minTime:0.5,maxTime:0.75};
-  }
-  return {min:5,max:7,minTime:0.25,maxTime:0.33};
-}
 
-function changeHuddlePriority(value){
-  huddleRows.priority=value;
-
-  const config=huddleConfig(value);
-
-  huddleRows.rows=[];
-
-  for(let i=0;i<config.min;i++){
-    huddleRows.rows.push({
-      title:'',
-      hours:value==='High'?4:value==='Medium'?0.5:0.25
-    });
-  }
-
-  renderApp();
-}
-
-function addHuddleRow(){
-  const config=huddleConfig(huddleRows.priority);
-
-  if(huddleRows.rows.length>=config.max){
-    return toast(`Maximum ${config.max} ${huddleRows.priority} tasks allowed.`,'err');
-  }
-
-  huddleRows.rows.push({
-    title:'',
-    hours:huddleRows.priority==='High'?4:huddleRows.priority==='Medium'?0.5:0.25
-  });
-
-  renderApp();
+function huddleConfig(priority) {
+  return HUDDLE_STAGES[priority] || HUDDLE_STAGES.High;
 }
 
 
-function renderAddTaskCard(){
-
-const config=huddleConfig(huddleRows.priority);
-
-if(!huddleRows.rows.length){
-  for(let i=0;i<config.min;i++){
-    huddleRows.rows.push({
-      title:'',
-      hours:huddleRows.priority==='High'?4:huddleRows.priority==='Medium'?0.5:0.25
-    });
-  }
+function huddleDurationOptions(priority) {
+  return huddleConfig(priority).durations;
 }
 
-return `
-<section class="card">
 
-<div class="card-head">
-<h3>➕ Morning Huddle 1-3-5</h3>
-<p>Create High, Medium and Low priority tasks.</p>
-</div>
+function huddleToday() {
+  return localDate();
+}
 
 
-<div class="field">
-<label>Priority</label>
+function defaultHuddleRow(priority) {
 
-<select onchange="changeHuddlePriority(this.value)">
-<option ${huddleRows.priority==='High'?'selected':''}>High</option>
-<option ${huddleRows.priority==='Medium'?'selected':''}>Medium</option>
-<option ${huddleRows.priority==='Low'?'selected':''}>Low</option>
-</select>
+  const options = huddleDurationOptions(priority);
 
-</div>
+  return {
+    title: '',
+    hours: options[0].value,
+    status: 'Pending',
+    notes: ''
+  };
 
-
-<form onsubmit="createTask(event)">
-
-${huddleRows.rows.map((r,i)=>`
-
-<div class="card">
-
-<h4>${huddleRows.priority} Task ${i+1}</h4>
-
-<div class="field">
-<label>Task Name</label>
-<input 
-name="title_${i}"
-value="${esc(r.title)}"
-oninput="huddleRows.rows[${i}].title=this.value"
-required
->
-</div>
+}
 
 
-<div class="field">
+function ensureHuddleRows(priority = huddleRows.priority) {
 
-<label>
-Duration 
-(${huddleRows.priority==='High'?'4-6 hours':huddleRows.priority==='Medium'?'30-45 minutes':'15-20 minutes'})
-</label>
+  const config = huddleConfig(priority);
 
-<input 
-type="number"
-step="0.25"
-name="hours_${i}"
-value="${r.hours}"
-oninput="huddleRows.rows[${i}].hours=this.value"
-required
->
+  if (!Array.isArray(huddleRows.rows)) {
+    huddleRows.rows = [];
+  }
 
-</div>
-</div>
+  while (huddleRows.rows.length < config.min) {
+    huddleRows.rows.push(
+      defaultHuddleRow(priority)
+    );
+  }
 
-`).join('')}
+  if (huddleRows.rows.length > config.max) {
+    huddleRows.rows =
+      huddleRows.rows.slice(0, config.max);
+  }
 
-
-${huddleRows.rows.length>=config.min && huddleRows.rows.length<config.max ?
-
-`<button 
-type="button"
-class="btn btn-light"
-onclick="addHuddleRow()">
-+ Add More ${huddleRows.priority} Task
-</button>`:''}
+}
 
 
-<br>
+function updateHuddleField(index, field, value) {
 
-<button class="btn btn-primary">
-Save Huddle Tasks
-</button>
+  if (!huddleRows.rows[index]) {
+    return;
+  }
+
+  huddleRows.rows[index][field] = value;
+
+}
 
 
-</form>
+function addHuddleRow() {
+
+  const config =
+    huddleConfig(huddleRows.priority);
+
+  if (
+    huddleRows.rows.length >=
+    config.max
+  ) {
+
+    return toast(
+      `Maximum ${config.max} ${huddleRows.priority} tasks allowed.`,
+      'err'
+    );
+
+  }
+
+  /*
+    IMPORTANT:
+    Do NOT call renderApp() here.
+
+    The new row is added directly to the existing
+    Huddle DOM so the text already typed into
+    previous rows cannot disappear.
+  */
+
+  huddleRows.rows.push(
+    defaultHuddleRow(huddleRows.priority)
+  );
+
+  const list =
+    document.querySelector('.huddle-list');
+
+  if (!list) {
+    return;
+  }
+
+  const index =
+    huddleRows.rows.length - 1;
+
+  const row =
+    huddleRows.rows[index];
+
+  const durationOptions =
+    huddleDurationOptions(
+      huddleRows.priority
+    );
+
+  const article =
+    document.createElement('article');
+
+  article.className =
+    'huddle-row';
+
+  article.innerHTML = `
+    <div class="huddle-row-head">
+
+      <strong>
+        ${esc(huddleRows.priority)}
+        Task ${index + 1}
+      </strong>
+
+      <div class="field-inline">
+
+        <label>Status</label>
+
+        <select
+          onchange="updateHuddleField(${index},'status',this.value)"
+        >
+
+          ${[
+            'Pending',
+            'In Progress',
+            'Completed',
+            'On Hold',
+            'Review'
+          ].map(status => `
+            <option value="${esc(status)}">
+              ${esc(status)}
+            </option>
+          `).join('')}
+
+        </select>
+
+      </div>
+
+    </div>
+
+
+    <div class="form-grid">
+
+      <div class="field wide">
+
+        <label>
+          Task Name
+        </label>
+
+        <input
+          type="text"
+          placeholder="Enter task name"
+          autocomplete="off"
+          oninput="
+            updateHuddleField(
+              ${index},
+              'title',
+              this.value
+            )
+          "
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Duration
+        </label>
+
+        <select
+          onchange="
+            updateHuddleField(
+              ${index},
+              'hours',
+              Number(this.value)
+            )
+          "
+        >
+
+          ${durationOptions.map(option => `
+            <option value="${option.value}">
+              ${esc(option.label)}
+            </option>
+          `).join('')}
+
+        </select>
+
+      </div>
+
+
+      <div class="field wide">
+
+        <label>
+          Notes
+          <span class="optional">
+            (Optional)
+          </span>
+        </label>
+
+        <input
+          type="text"
+          placeholder="Optional notes"
+          autocomplete="off"
+          oninput="
+            updateHuddleField(
+              ${index},
+              'notes',
+              this.value
+            )
+          "
+        >
+
+      </div>
+
+    </div>
+  `;
+
+  list.appendChild(article);
+
+  /*
+    Keep the Add Task button at the bottom.
+  */
+
+  const addButton =
+    document.querySelector(
+      '.huddle-add-task'
+    );
+
+  if (addButton) {
+
+    addButton.remove();
+
+  }
+
+  if (
+    huddleRows.rows.length <
+    config.max
+  ) {
+
+    const button =
+      document.createElement('button');
+
+    button.type = 'button';
+
+    button.className =
+      'btn btn-light huddle-add-task';
+
+    button.textContent =
+      '+ Click to Add Task';
+
+    button.onclick =
+      addHuddleRow;
+
+    list.parentElement.insertBefore(
+      button,
+      list.nextSibling
+    );
+
+  }
+
+}
+
+
+function huddleNextPriority(priority) {
+
+  if (priority === 'High') {
+    return 'Medium';
+  }
+
+  if (priority === 'Medium') {
+    return 'Low';
+  }
+
+  return null;
+
+}
+
+
+function huddlePriorityLabel(priority) {
+
+  if (priority === 'High') {
+    return '1 High Priority Task';
+  }
+
+  if (priority === 'Medium') {
+    return '3–5 Medium Priority Tasks';
+  }
+
+  return '5–7 Low Priority Tasks';
+
+}
+
+
+function huddleDurationRule(priority) {
+
+  if (priority === 'High') {
+    return '4–6 hours';
+  }
+
+  if (priority === 'Medium') {
+    return '30–40 minutes';
+  }
+
+  return '15–25 minutes';
+
+}
+
+
+function renderAddTaskCard() {
+
+  ensureHuddleRows();
+
+  const priority =
+    huddleRows.priority;
+
+  const config =
+    huddleConfig(priority);
+
+  const durationOptions =
+    huddleDurationOptions(priority);
+
+  const today =
+    huddleToday();
+
+
+  return `
+
+<section class="card huddle-card">
+
+  <div class="card-head huddle-header">
+
+    <div>
+
+      <h3>➕ Add Your Task</h3>
+
+      <p>
+        Build your daily 1-3-5 task plan.
+      </p>
+
+    </div>
+
+
+    <div class="huddle-date">
+
+      <label>
+        Date
+      </label>
+
+      <input
+        type="date"
+        value="${today}"
+        readonly
+      >
+
+    </div>
+
+  </div>
+
+
+  <div class="huddle-stage-bar">
+
+    <div class="
+      huddle-stage
+      ${priority === 'High' ? 'active' : ''}
+      ${priority !== 'High' ? 'completed' : ''}
+    ">
+
+      <span class="huddle-stage-number">
+        ${priority === 'High' ? '1' : '✓'}
+      </span>
+
+      High
+
+    </div>
+
+
+    <div class="
+      huddle-stage
+      ${priority === 'Medium' ? 'active' : ''}
+      ${priority === 'Low' ? 'completed' : ''}
+    ">
+
+      <span class="huddle-stage-number">
+        ${
+          priority === 'High'
+            ? '2'
+            : priority === 'Medium'
+              ? '2'
+              : '✓'
+        }
+      </span>
+
+      Medium
+
+    </div>
+
+
+    <div class="
+      huddle-stage
+      ${priority === 'Low' ? 'active' : ''}
+    ">
+
+      <span class="huddle-stage-number">
+        3
+      </span>
+
+      Low
+
+    </div>
+
+  </div>
+
+
+  <div class="huddle-current-stage">
+
+    <strong>
+      ${esc(priority)} Priority
+    </strong>
+
+    <span>
+      ${esc(huddlePriorityLabel(priority))}
+      · ${esc(huddleDurationRule(priority))}
+    </span>
+
+  </div>
+
+
+  <div class="huddle-list">
+
+    ${huddleRows.rows.map((row, i) => `
+
+      <article class="huddle-row">
+
+        <div class="huddle-row-head">
+
+          <strong>
+            ${esc(priority)}
+            Task ${i + 1}
+          </strong>
+
+
+          <div class="field-inline">
+
+            <label>
+              Status
+            </label>
+
+            <select
+              onchange="
+                updateHuddleField(
+                  ${i},
+                  'status',
+                  this.value
+                )
+              "
+            >
+
+              ${[
+                'Pending',
+                'In Progress',
+                'Completed',
+                'On Hold',
+                'Review'
+              ].map(status => `
+
+                <option
+                  value="${esc(status)}"
+                  ${
+                    row.status === status
+                      ? 'selected'
+                      : ''
+                  }
+                >
+                  ${esc(status)}
+                </option>
+
+              `).join('')}
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+        <div class="form-grid">
+
+
+          <div class="field wide">
+
+            <label>
+              Task Name
+            </label>
+
+            <input
+              type="text"
+              value="${esc(row.title)}"
+              placeholder="Enter task name"
+              autocomplete="off"
+              oninput="
+                updateHuddleField(
+                  ${i},
+                  'title',
+                  this.value
+                )
+              "
+              required
+            >
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Duration
+            </label>
+
+            <select
+              onchange="
+                updateHuddleField(
+                  ${i},
+                  'hours',
+                  Number(this.value)
+                )
+              "
+              required
+            >
+
+              ${durationOptions.map(option => `
+
+                <option
+                  value="${option.value}"
+                  ${
+                    Number(row.hours) ===
+                    Number(option.value)
+                      ? 'selected'
+                      : ''
+                  }
+                >
+                  ${esc(option.label)}
+                </option>
+
+              `).join('')}
+
+            </select>
+
+          </div>
+
+
+          <div class="field wide">
+
+            <label>
+              Notes
+              <span class="optional">
+                (Optional)
+              </span>
+            </label>
+
+            <input
+              type="text"
+              value="${esc(row.notes)}"
+              placeholder="Optional notes"
+              autocomplete="off"
+              oninput="
+                updateHuddleField(
+                  ${i},
+                  'notes',
+                  this.value
+                )
+              "
+            >
+
+          </div>
+
+
+        </div>
+
+      </article>
+
+    `).join('')}
+
+  </div>
+
+
+  ${
+    huddleRows.rows.length < config.max
+      ? `
+        <button
+          type="button"
+          class="btn btn-light huddle-add-task"
+          onclick="addHuddleRow()"
+        >
+          + Click to Add Task
+        </button>
+      `
+      : ''
+  }
+
+
+  <div class="huddle-actions">
+
+    <span class="huddle-rule">
+
+      ${
+        priority === 'High'
+          ? '1 task · 4–6 hours'
+          : priority === 'Medium'
+            ? '3–5 tasks · 30–40 minutes each'
+            : '5–7 tasks · 15–25 minutes each'
+      }
+
+    </span>
+
+
+    <button
+      type="button"
+      class="btn btn-primary"
+      onclick="saveHuddleTasks()"
+      ${state.busy ? 'disabled' : ''}
+    >
+      Save ${esc(priority)} Tasks
+    </button>
+
+  </div>
+
 
 </section>
+
 `;
-}
-
-
-
-async function createTask(event){
-
-event.preventDefault();
-
-const form=new FormData(event.target);
-
-const config=huddleConfig(huddleRows.priority);
-
-
-if(huddleRows.rows.length<config.min){
-
-return toast(
-`Minimum ${config.min} ${huddleRows.priority} tasks required`,
-'err'
-);
 
 }
 
 
-state.busy=true;
+async function saveHuddleTasks() {
+
+  ensureHuddleRows();
+
+  const priority =
+    huddleRows.priority;
+
+  const config =
+    huddleConfig(priority);
+
+  const rows =
+    huddleRows.rows;
 
 
-try{
+  if (rows.length < config.min) {
 
-for(let i=0;i<huddleRows.rows.length;i++){
+    return toast(
+      `Minimum ${config.min} ${priority} task${config.min === 1 ? '' : 's'} required.`,
+      'err'
+    );
 
-let title = huddleRows.rows[i].title.trim();
-let hours = Number(huddleRows.rows[i].hours);
-
-if(!title){
-  throw new Error(`Task ${i+1} name is required`);
-}
-
-if(huddleRows.priority==='High' && (hours<4 || hours>6))
-  throw new Error('High task must be between 4 and 6 hours');
-
-if(huddleRows.priority==='Medium' && (hours<0.5 || hours>0.75))
-  throw new Error('Medium task must be 30-45 minutes');
-
-if(huddleRows.priority==='Low' && (hours<0.25 || hours>0.33))
-  throw new Error('Low task must be 15-20 minutes');
-
-
-await api('task.create',{
-  method:'POST',
-  body:{
-    memberId:state.user.id,
-    title:title,
-    taskDate:state.workDate,
-    hours:hours,
-    priority:huddleRows.priority,
-    status:'Pending',
-    notes:'Morning Huddle 1-3-5'
   }
-});
+
+
+  const allowedDurations =
+    huddleDurationOptions(priority)
+      .map(option => Number(option.value));
+
+
+  /*
+    Validate EVERYTHING before sending
+    anything to the database.
+  */
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i++
+  ) {
+
+    const row =
+      rows[i];
+
+    const title =
+      String(row.title || '').trim();
+
+    const hours =
+      Number(row.hours);
+
+
+    if (!title) {
+
+      return toast(
+        `${priority} Task ${i + 1}: Task name is required.`,
+        'err'
+      );
+
+    }
+
+
+    if (
+      !allowedDurations.some(
+        value =>
+          Math.abs(value - hours) < 0.000001
+      )
+    ) {
+
+      return toast(
+        `${priority} Task ${i + 1}: Select a valid duration.`,
+        'err'
+      );
+
+    }
+
+
+    if (
+      ![
+        'Pending',
+        'In Progress',
+        'Completed',
+        'On Hold',
+        'Review'
+      ].includes(row.status)
+    ) {
+
+      return toast(
+        `${priority} Task ${i + 1}: Select a valid status.`,
+        'err'
+      );
+
+    }
+
+  }
+
+
+  state.busy = true;
+
+
+  try {
+
+    const taskDate =
+      huddleToday();
+
+
+    for (
+      const row of rows
+    ) {
+
+      await api(
+        'task.create',
+        {
+          method: 'POST',
+
+          body: {
+
+            memberId:
+              state.user.id,
+
+            title:
+              String(row.title).trim(),
+
+            taskDate,
+
+            hours:
+              Number(row.hours),
+
+            priority,
+
+            status:
+              row.status,
+
+            notes:
+              String(row.notes || '').trim()
+
+          }
+
+        }
+      );
+
+    }
+
+
+    const next =
+      huddleNextPriority(priority);
+
+
+    if (next) {
+
+      huddleRows = {
+
+        priority: next,
+
+        rows: []
+
+      };
+
+      ensureHuddleRows(next);
+
+
+      toast(
+        `${priority} tasks saved. Next: ${next} priority.`
+      );
+
+    } else {
+
+      huddleRows = {
+
+        priority: 'High',
+
+        rows: []
+
+      };
+
+      ensureHuddleRows('High');
+
+
+      toast(
+        'All 1-3-5 tasks saved successfully.'
+      );
+
+    }
+
+
+    await loadData(false);
+
+
+  } catch (e) {
+
+    toast(
+      e.message,
+      'err'
+    );
+
+  } finally {
+
+    state.busy = false;
+
+  }
 
 }
 
 
-
-huddleRows.rows=[];
-
-toast('Huddle tasks saved and Sheet sync started.');
-
-await loadData(false);
-
-
-}catch(e){
-
-toast(e.message,'err');
-
-}
-
-finally{
-
-state.busy=false;
-
-}
-
-}async function createTask(event){
-
-event.preventDefault();
-
-const form = new FormData(event.target);
-
-const config = huddleConfig(huddleRows.priority);
-
-
-// sync form values before saving
-huddleRows.rows.forEach((row,i)=>{
-
-const title=form.get(`title_${i}`);
-const hours=form.get(`hours_${i}`);
-
-if(title!==null){
-row.title=String(title).trim();
-}
-
-if(hours!==null){
-row.hours=hours;
-}
-
-});
-
-
-if(huddleRows.rows.length < config.min){
-return toast(
-`Minimum ${config.min} ${huddleRows.priority} tasks required`,
-'err'
-);
-}
-
-
-state.busy=true;
-
-
-try{
-
-
-for(let i=0;i<huddleRows.rows.length;i++){
-
-const row=huddleRows.rows[i];
-
-const title=row.title.trim();
-const hours=Number(row.hours);
-
-
-if(!title){
-throw new Error(`Task ${i+1} name is required`);
-}
-
-
-if(!Number.isFinite(hours)){
-throw new Error(`Task ${i+1} duration is required`);
-}
-
-
-if(
-huddleRows.priority==='High' &&
-(hours<4 || hours>6)
-){
-throw new Error('High task must be between 4 and 6 hours');
-}
-
-
-if(
-huddleRows.priority==='Medium' &&
-(hours<0.5 || hours>0.75)
-){
-throw new Error('Medium task must be 30-45 minutes');
-}
-
-
-if(
-huddleRows.priority==='Low' &&
-(hours<0.25 || hours>0.33)
-){
-throw new Error('Low task must be 15-20 minutes');
-}
-
-
-
-await api('task.create',{
-method:'POST',
-body:{
-memberId:state.user.id,
-title:title,
-taskDate:state.workDate,
-hours:hours,
-priority:huddleRows.priority,
-status:'Pending',
-notes:'Morning Huddle 1-3-5'
-}
-});
-
-
-}
-
-
-huddleRows.rows=[];
-
-toast('Huddle tasks saved and Sheet sync started.');
-
-await loadData(false);
-
-
-}
-catch(e){
-
-toast(e.message,'err');
-
-}
-finally{
-
-state.busy=false;
-
-}
-
-}
 async function saveAttendance(type){
   const input=document.getElementById(type==='login'?'loginTime':'logoutTime'); if(!input?.value)return toast('Select a time first.','err');state.busy=true;
   try{await api('attendance.save',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate,[type==='login'?'loginTime':'logoutTime']:input.value}});toast(`${type==='login'?'Login':'Logout'} time saved.`);await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
