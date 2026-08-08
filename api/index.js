@@ -406,18 +406,45 @@ async function handleCreateTask(req, res, db, actor) {
   const hours = Number(req.body?.hours);
   const status = cleanText(req.body?.status, 30) || 'Pending';
   const notes = cleanText(req.body?.notes, 1500);
-const priority = cleanText(req.body?.priority, 20) || 'Medium';
+  const priority = cleanText(req.body?.priority, 20) || 'Medium';
 
   if (!(await canAssignTo(db, actor, memberId))) return send(res, 403, { error: 'You cannot assign a task to this member.' });
   if (!title) return send(res, 400, { error: 'Task name is required.' });
   if (!validDate(date)) return send(res, 400, { error: 'Choose a valid task date.' });
-  if (!Number.isFinite(hours) || hours < 0 || hours > 24) return send(res, 400, { error: 'Hours must be between 0 and 24.' });
-  if (!['Pending','In Progress','Completed','On Hold','Review'].includes(status)) {
-  return send(res, 400, { error: 'Invalid task status.' });
+  if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+  return send(res, 400, {
+    error: 'Hours must be between 0 and 24.'
+  });
 }
 
-if (!['High','Medium','Low'].includes(priority)) {
-  return send(res, 400, { error: 'Invalid task priority.' });
+if (!['High', 'Medium', 'Low'].includes(priority)) {
+  return send(res, 400, {
+    error: 'Invalid task priority.'
+  });
+}
+
+if (priority === 'High' && hours !== 5.25) {
+  return send(res, 400, {
+    error: 'High priority task duration must be 5 hours 15 minutes.'
+  });
+}
+
+if (priority === 'Medium' && hours !== 0.5) {
+  return send(res, 400, {
+    error: 'Medium priority task duration must be 30 minutes.'
+  });
+}
+
+if (priority === 'Low' && hours !== 0.25) {
+  return send(res, 400, {
+    error: 'Low priority task duration must be 15 minutes.'
+  });
+}
+
+if (!['Pending', 'In Progress', 'Completed', 'On Hold', 'Review'].includes(status)) {
+  return send(res, 400, {
+    error: 'Invalid task status.'
+  });
 }
 
   const { data: attendance } = await db
