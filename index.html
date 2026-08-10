@@ -203,15 +203,120 @@ function logout(confirmFirst=true){
   if(confirmFirst&&!confirm('Sign out?'))return;
   state.token='';state.user=null;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
 }
+function nextWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+
+  d.setUTCDate(d.getUTCDate() + 1);
+
+  // Skip Sunday.
+  if (d.getUTCDay() === 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+
+  return d.toISOString().slice(0, 10);
+}
+
+function getUnlockedWorkDate() {
+  const today = localDate();
+
+  // Walk backwards from today until we find the most recent
+  // workday that has already been finished.
+  let cursor = today;
+  let lastFinished = null;
+
+  for (let i = 0; i < 370; i++) {
+    if (!isSundayDate(cursor) && isWorkDateFinished(cursor)) {
+      lastFinished = cursor;
+      break;
+    }
+
+    const [year, month, day] = cursor.split('-').map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    d.setUTCDate(d.getUTCDate() - 1);
+
+    cursor = d.toISOString().slice(0, 10);
+  }
+
+  // If a previous workday has been finished,
+  // the next workday is the only unlocked day.
+  if (lastFinished) {
+    const next = nextWorkDate(lastFinished);
+
+    if (next <= today && !isSundayDate(next)) {
+      return next;
+    }
+  }
+
+  /*
+   * No finished day found yet.
+   *
+   * Look at existing tasks/attendance to find the earliest
+   * workday that needs completing. This handles existing data
+   * such as Monday's tasks when Monday has not been finished.
+   */
+  const existingDates = [
+    ...state.tasks
+      .filter(t => t.memberId === state.user?.id && t.taskDate <= today)
+      .map(t => t.taskDate),
+
+    ...state.attendance
+      .filter(a => a.memberId === state.user?.id && a.workDate <= today)
+      .map(a => a.workDate)
+  ]
+    .filter(date => date && !isSundayDate(date))
+    .sort();
+
+  if (existingDates.length) {
+    return existingDates[0];
+  }
+
+  // Brand-new user: start with today unless today is Sunday.
+  if (!isSundayDate(today)) {
+    return today;
+  }
+
+  return nextWorkDate(today);
+}
+
+function setUnlockedWorkDate() {
+  if (!state.user?.id) return;
+
+  const unlocked = getUnlockedWorkDate();
+
+  if (unlocked) {
+    state.workDate = unlocked;
+  }
+}
+
 async function loadData(show=true){
   if(!state.token)return renderLogin();
+
   try{
     const data=await api('bootstrap');
-    Object.assign(state,{user:data.user,company:data.company,members:data.members,tasks:data.tasks,attendance:data.attendance,notifications:data.notifications});
-    setBrand(); renderApp();
-  }catch(e){ if(show)toast(e.message,'err'); }
-}
-function startPolling(){clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
+
+    Object.assign(state,{
+      user:data.user,
+      company:data.company,
+      members:data.members,
+      tasks:data.tasks,
+      attendance:data.attendance,
+      notifications:data.notifications
+    });
+
+    /*
+     * Always calculate the correct sequential workday
+     * after fresh attendance/task data arrives.
+     */
+    setUnlockedWorkDate();
+
+    setBrand();
+    renderApp();
+
+  }catch(e){
+    if(show)toast(e.message,'err');
+  }
+}function startPolling(){clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
 
 function renderLogin(){
   const c=state.company||{name:'Team Task Tracker',tagline:'Shared team productivity portal'};setBrand();
