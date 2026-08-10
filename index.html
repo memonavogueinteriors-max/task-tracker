@@ -256,14 +256,81 @@ function renderWork(){
   return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><button class="btn btn-primary" onclick="openRing()">🔔 Ring</button></div>
     <section class="grid stats">${stats.map(s=>`<div class="stat"><div class="label">${esc(s[0])}</div><div class="value">${esc(s[1])}</div><div class="meta">${esc(s[2])}</div></div>`).join('')}</section>
     <section class="card"><div class="card-head"><div><h3>🕘 Attendance</h3><p>You choose the official login and logout times.</p></div><span><span class="status-dot ${attendance?.finishedAt?'done':attendance?.loginTime?'on':''}"></span>${attendance?.finishedAt?'Day Finished':attendance?.loginTime?'On Duty':'Off Duty'}</span></div>
-      <div class="attendance"><div class="field"><label>Work Date</label><input type="date" value="${esc(date)}" onchange="changeWorkDate(this.value)"></div><div class="field"><label>Login Time</label><input id="loginTime" type="time" value="${esc(attendance?.loginTime||'09:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-green" onclick="saveAttendance('login')" ${attendance?.finishedAt?'disabled':''}>Save Login</button><div class="field"><label>Logout Time</label><input id="logoutTime" type="time" value="${esc(attendance?.logoutTime||'17:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-danger" onclick="saveAttendance('logout')" ${attendance?.finishedAt?'disabled':''}>Save Logout</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>✅ Finish Day</button></div>
+      <div class="attendance"><div class="field"><label>Work Date</label><input
+  type="date"
+  value="${esc(date)}"
+  max="${esc(localDate())}"
+  onchange="changeWorkDate(this.value)"
+></div><div class="field"><label>Login Time</label><input id="loginTime" type="time" value="${esc(attendance?.loginTime||'09:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-green" onclick="saveAttendance('login')" ${attendance?.finishedAt?'disabled':''}>Save Login</button><div class="field"><label>Logout Time</label><input id="logoutTime" type="time" value="${esc(attendance?.logoutTime||'17:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-danger" onclick="saveAttendance('logout')" ${attendance?.finishedAt?'disabled':''}>Save Logout</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>✅ Finish Day</button></div>
       ${attendance?.finishedAt?`<div class="success">Finished on ${esc(formatDateTime(attendance.finishedAt))}. This day is stored permanently and synced to Google Sheets.</div>`:''}
     </section>
     ${renderAddTaskCard()}
     <section class="card"><div class="card-head"><div><h3>Tasks for ${esc(formatDate(date))}</h3><p>${mine.length} task(s), ${totalHours.toFixed(1)} total hour(s)</p></div></div>${renderTaskTable(mine,true)}</section>
     ${attendance?.finishedAt?renderOneDayBlock(state.user.id,date):''}`;
 }
-function changeWorkDate(value){state.workDate=value||localDate();renderApp();}
+function isSundayDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+function previousRequiredWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = current.getUTCDay();
+
+  if (dayOfWeek === 0) return null;
+
+  if (dayOfWeek === 1) {
+    current.setUTCDate(current.getUTCDate() - 2);
+  } else {
+    current.setUTCDate(current.getUTCDate() - 1);
+  }
+
+  return current.toISOString().slice(0, 10);
+}
+
+function isWorkDateFinished(date) {
+  return !!attendanceFor(state.user.id, date)?.finishedAt;
+}
+
+function canSelectWorkDate(date) {
+  if (!date) return false;
+
+  const today = localDate();
+
+  // Never allow future dates.
+  if (date > today) return false;
+
+  // Sunday is always OFF.
+  if (isSundayDate(date)) return false;
+
+  // Past dates can be selected so unfinished work can be completed.
+  if (date < today) return true;
+
+  // Today is available only when the previous required workday is finished.
+  const previousDate = previousRequiredWorkDate(date);
+
+  if (!previousDate) return true;
+
+  return isWorkDateFinished(previousDate);
+}
+
+function changeWorkDate(value) {
+  const selected = value || localDate();
+
+  if (!canSelectWorkDate(selected)) {
+    toast(
+      isSundayDate(selected)
+        ? 'Sunday is an OFF day.'
+        : 'Finish the previous workday before starting this date.',
+      'err'
+    );
+    return;
+  }
+
+  state.workDate = selected;
+  renderApp();
+}
 
 
 /* =========================
@@ -653,19 +720,6 @@ function renderAddTaskCard() {
     </div>
 
 
-    <div class="huddle-date">
-
-      <label>
-        Date
-      </label>
-
-      <input
-        type="date"
-        value="${today}"
-        readonly
-      >
-
-    </div>
 
   </div>
 
