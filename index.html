@@ -116,13 +116,59 @@ function unreadCount(){return state.notifications.filter(n=>!n.readAt).length;}
 
 async function api(action, options={}) {
   const method = options.method || 'GET';
-  const headers = {'Accept':'application/json'};
-  if (state.token) headers.Authorization = `Bearer ${state.token}`;
-  if (options.body !== undefined) headers['Content-Type']='application/json';
-  const response = await fetch(`/api?action=${encodeURIComponent(action)}`, { method, headers, body: options.body===undefined?undefined:JSON.stringify(options.body) });
-  let data={}; try{data=await response.json();}catch{}
-  if(response.status===401 && action!=='login'){ logout(false); throw new Error(data.error||'Session expired.'); }
-  if(!response.ok) throw new Error(data.error||'Request failed.');
+
+  async function request() {
+    const headers = {'Accept':'application/json'};
+
+    if (state.token) {
+      headers.Authorization = `Bearer ${state.token}`;
+    }
+
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    return fetch(
+      `/api?action=${encodeURIComponent(action)}`,
+      {
+        method,
+        headers,
+        body: options.body === undefined
+          ? undefined
+          : JSON.stringify(options.body)
+      }
+    );
+  }
+
+  let response = await request();
+
+  /*
+   * A temporary 401 during polling should not immediately
+   * destroy the user's session. Retry once.
+   */
+  if (response.status === 401 && action !== 'login') {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    response = await request();
+  }
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {}
+
+  /*
+   * Only log out after the retry also confirms that
+   * the session is invalid.
+   */
+  if (response.status === 401 && action !== 'login') {
+    logout(false);
+    throw new Error(data.error || 'Session expired.');
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed.');
+  }
+
   return data;
 }
 
@@ -178,7 +224,7 @@ function renderLogin(){
         <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="current-password" placeholder="4–8 digits" required></div>
         <div id="loginError"></div><button class="btn btn-dark full" type="submit">Sign In →</button>
       </form>
-      
+
     </section></main>`;
 }
 
@@ -626,14 +672,6 @@ function renderAddTaskCard() {
 
   <div class="huddle-current-stage">
 
-    <strong>
-      ${esc(priority)} Priority
-    </strong>
-
-    <span>
-      ${esc(huddlePriorityLabel(priority))}
-      · ${esc(huddleDurationRule(priority))}
-    </span>
 
   </div>
 

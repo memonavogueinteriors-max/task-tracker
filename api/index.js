@@ -26,7 +26,25 @@ function cleanText(value, max = 500) {
 function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 }
+function previousRequiredWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
 
+  // Sunday is an OFF day.
+  // Monday checks Saturday.
+  // Other days check the immediately previous day.
+  const dayOfWeek = current.getUTCDay();
+
+  if (dayOfWeek === 0) return null;
+
+  if (dayOfWeek === 1) {
+    current.setUTCDate(current.getUTCDate() - 2);
+  } else {
+    current.setUTCDate(current.getUTCDate() - 1);
+  }
+
+  return current.toISOString().slice(0, 10);
+}
 function validTime(value) {
   return value === null || value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value));
 }
@@ -411,6 +429,32 @@ async function handleCreateTask(req, res, db, actor) {
   if (!(await canAssignTo(db, actor, memberId))) return send(res, 403, { error: 'You cannot assign a task to this member.' });
   if (!title) return send(res, 400, { error: 'Task name is required.' });
   if (!validDate(date)) return send(res, 400, { error: 'Choose a valid task date.' });
+const [taskYear, taskMonth, taskDay] = date.split('-').map(Number);
+const taskDateObject = new Date(Date.UTC(taskYear, taskMonth - 1, taskDay));
+
+if (taskDateObject.getUTCDay() === 0) {
+  return send(res, 409, {
+    error: 'Sunday is an OFF day. Tasks cannot be added on Sunday.'
+  });
+}
+const previousDate = previousRequiredWorkDate(date);
+
+if (previousDate) {
+  const { data: previousAttendance, error: previousAttendanceError } = await db
+    .from('attendance')
+    .select('finished_at')
+    .eq('member_id', memberId)
+    .eq('work_date', previousDate)
+    .maybeSingle();
+
+  if (previousAttendanceError) throw previousAttendanceError;
+
+  if (!previousAttendance?.finished_at) {
+    return send(res, 409, {
+      error: `You must finish ${previousDate} before adding tasks for ${date}.`
+    });
+  }
+}
   if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
   return send(res, 400, {
     error: 'Hours must be between 0 and 24.'
@@ -511,9 +555,45 @@ async function handleUpdateTask(req, res, db, actor) {
   }
   if (req.body?.notes !== undefined) patch.notes = cleanText(req.body.notes, 1500);
   if (req.body?.taskDate !== undefined) {
-    patch.task_date = cleanText(req.body.taskDate, 10);
-    if (!validDate(patch.task_date)) return send(res, 400, { error: 'Choose a valid task date.' });
+  patch.task_date = cleanText(req.body.taskDate, 10);
+
+  if (!validDate(patch.task_date)) {
+    return send(res, 400, {
+      error: 'Choose a valid task date.'
+    });
   }
+
+  const [taskYear, taskMonth, taskDay] = patch.task_date.split('-').map(Number);
+  const taskDateObject = new Date(
+    Date.UTC(taskYear, taskMonth - 1, taskDay)
+  );
+
+  if (taskDateObject.getUTCDay() === 0) {
+    return send(res, 409, {
+      error: 'Sunday is an OFF day. Tasks cannot be added on Sunday.'
+    });
+  }
+
+  const previousDate = previousRequiredWorkDate(patch.task_date);
+
+  if (previousDate) {
+    const { data: previousAttendance, error: previousAttendanceError } =
+      await db
+        .from('attendance')
+        .select('finished_at')
+        .eq('member_id', existing.member_id)
+        .eq('work_date', previousDate)
+        .maybeSingle();
+
+    if (previousAttendanceError) throw previousAttendanceError;
+
+    if (!previousAttendance?.finished_at) {
+      return send(res, 409, {
+        error: `You must finish ${previousDate} before changing this task to ${patch.task_date}.`
+      });
+    }
+  }
+}
 
   const { data, error } = await db.from('tasks').update(patch).eq('id', id).select('*').single();
   if (error) throw error;
