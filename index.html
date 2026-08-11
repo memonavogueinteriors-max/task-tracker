@@ -317,6 +317,126 @@ function changeWorkDate(value) {
   renderApp();
 }
 
+function renderLogin(){
+  const c=state.company||{name:'Team Task Tracker',tagline:'Shared team productivity portal'};setBrand();
+  document.getElementById('root').innerHTML=`
+    <main class="login"><section class="login-card">
+      <div class="brand">${brandLogo()}<div><h1>${esc(c.name||'Team Task Tracker')}</h1><p>${esc(c.tagline||'Shared team productivity portal')}</p></div></div>
+      <h2>Welcome back ­ƒæï</h2><p class="sub">Sign in with the Employee ID and PIN given by your Owner.</p>
+      <form onsubmit="login(event)">
+        <div class="field"><label>Employee ID</label><input name="employeeId" autocomplete="username" placeholder="OWNER or EMP-001" required></div>
+        <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="current-password" placeholder="4ÔÇô8 digits" required></div>
+        <div id="loginError"></div><button class="btn btn-dark full" type="submit">Sign In ÔåÆ</button>
+      </form>
+
+    </section></main>`;
+}
+
+function renderApp(){
+  if(!state.user)return renderLogin();
+  const c=state.company||{}; const tabs=[['work','­ƒôï My Work'],...(canManageTeam()?[['team','­ƒæÑ Team'],['tasks','Ô£à Team Tasks']]:[]),['records','­ƒôà Daily Records'],...(isOwner()?[['settings','ÔÜÖ´©Å Settings']]:[])];
+  document.getElementById('root').innerHTML=`
+    <div class="app"><header class="header"><div class="header-inner">
+      <div class="brand">${brandLogo()}<div><h1>${esc(c.name||'Team Task Tracker')}</h1><p>${esc(c.tagline||'Team productivity portal')}</p></div></div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="openRing()" title="Ring">­ƒöö</button>
+        <button class="icon-btn" onclick="toggleNotifications()" title="Notifications">­ƒöö${unreadCount()?`<span class="badge">${unreadCount()}</span>`:''}</button>
+        <div class="user-chip"><div class="avatar">${esc(initials(state.user.name))}</div><div><strong>${esc(state.user.name)}</strong><span>${esc(niceRole(state.user.role))}</span></div></div>
+        <button class="icon-btn" onclick="logout()" title="Sign out">Ôå¬</button>
+      </div>
+    </div></header>
+    <div class="layout"><aside class="sidebar"><div class="nav-title">Workspace</div>${tabs.map(([id,label])=>`<button class="nav-btn ${state.tab===id?'active':''}" onclick="goTab('${id}')">${label}</button>`).join('')}</aside>
+    <main class="content">${renderCurrentTab()}</main></div></div>
+    ${state.notificationsOpen?renderNotifications():''}${renderModal()}`;
+}
+function goTab(tab){state.tab=tab;state.modal=null;state.notificationsOpen=false;renderApp();}
+function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();return renderWork();}
+
+function renderWork(){
+  const date=state.workDate;const mine=tasksFor(state.user.id,date);const attendance=attendanceFor(state.user.id,date);const totalHours=mine.reduce((s,t)=>s+Number(t.hours||0),0);const completed=mine.filter(t=>t.status==='Completed').length;
+  const companyTasksToday=state.tasks.filter(t=>t.taskDate===date); const stats=canManageTeam()?[
+    ['Team Members',state.members.length,'Active users visible to you'],['Tasks on Date',companyTasksToday.length,formatDate(date)],['Completed',companyTasksToday.filter(t=>t.status==='Completed').length,'Across visible team'],['Logged Hours',companyTasksToday.reduce((s,t)=>s+Number(t.hours||0),0).toFixed(1),'Across visible team']
+  ]:[['My Tasks',mine.length,formatDate(date)],['Completed',completed,'Tasks completed'],['Hours',totalHours.toFixed(1),'Task hours recorded'],['Day',attendance?.finishedAt?'Finished':attendance?.loginTime?'On Duty':'Not Started',attendance?.loginTime?`${attendance.loginTime} ÔÇô ${attendance.logoutTime||'ÔÇª'}`:'Select times below']];
+  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><button class="btn btn-primary" onclick="openRing()">­ƒöö Ring</button></div>
+    <section class="grid stats">${stats.map(s=>`<div class="stat"><div class="label">${esc(s[0])}</div><div class="value">${esc(s[1])}</div><div class="meta">${esc(s[2])}</div></div>`).join('')}</section>
+    <section class="card"><div class="card-head"><div><h3>­ƒòÿ Attendance</h3><p>You choose the official login and logout times.</p></div><span><span class="status-dot ${attendance?.finishedAt?'done':attendance?.loginTime?'on':''}"></span>${attendance?.finishedAt?'Day Finished':attendance?.loginTime?'On Duty':'Off Duty'}</span></div>
+      <div class="attendance"><div class="field"><label>Work Date</label><input
+  type="date"
+  value="${esc(date)}"
+  max="${esc(localDate())}"
+  onchange="changeWorkDate(this.value)"
+></div><div class="field"><label>Login Time</label><input id="loginTime" type="time" value="${esc(attendance?.loginTime||'09:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-green" onclick="saveAttendance('login')" ${attendance?.finishedAt?'disabled':''}>Save Login</button><div class="field"><label>Logout Time</label><input id="logoutTime" type="time" value="${esc(attendance?.logoutTime||'17:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-danger" onclick="saveAttendance('logout')" ${attendance?.finishedAt?'disabled':''}>Save Logout</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>Ô£à Finish Day</button></div>
+      ${attendance?.finishedAt?`<div class="success">Finished on ${esc(formatDateTime(attendance.finishedAt))}. This day is stored permanently and synced to Google Sheets.</div>`:''}
+    </section>
+    ${renderAddTaskCard()}
+    <section class="card"><div class="card-head"><div><h3>Tasks for ${esc(formatDate(date))}</h3><p>${mine.length} task(s), ${totalHours.toFixed(1)} total hour(s)</p></div></div>${renderTaskTable(mine,true)}</section>
+    ${attendance?.finishedAt?renderOneDayBlock(state.user.id,date):''}`;
+}
+function isSundayDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+function previousRequiredWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = current.getUTCDay();
+
+  if (dayOfWeek === 0) return null;
+
+  if (dayOfWeek === 1) {
+    current.setUTCDate(current.getUTCDate() - 2);
+  } else {
+    current.setUTCDate(current.getUTCDate() - 1);
+  }
+
+  return current.toISOString().slice(0, 10);
+}
+
+function isWorkDateFinished(date) {
+  return !!attendanceFor(state.user.id, date)?.finishedAt;
+}
+
+function canSelectWorkDate(date) {
+  if (!date) return false;
+
+  const today = localDate();
+
+  // Never allow future dates.
+  if (date > today) return false;
+
+  // Sunday is always OFF.
+  if (isSundayDate(date)) return false;
+
+  // Past dates can be selected so unfinished work can be completed.
+  if (date < today) return true;
+
+  // Today is available only when the previous required workday is finished.
+  const previousDate = previousRequiredWorkDate(date);
+
+  if (!previousDate) return true;
+
+  return isWorkDateFinished(previousDate);
+}
+
+function changeWorkDate(value) {
+  const selected = value || localDate();
+
+  if (!canSelectWorkDate(selected)) {
+    toast(
+      isSundayDate(selected)
+        ? 'Sunday is an OFF day.'
+        : 'Finish the previous workday before starting this date.',
+      'err'
+    );
+    return;
+  }
+
+  state.workDate = selected;
+  renderApp();
+}
+
+
 /* =========================
    ADD YOUR TASK
    DAILY 1-3-5 FLOW
