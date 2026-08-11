@@ -92,7 +92,6 @@ const state = {
   modal: null, editingTask: null, editingMember: null, notificationsOpen: false, busy: false
 };
 let pollTimer = null;
-const TRACKER_START_DATE = '2026-08-10';
 function localDate(date = new Date()) {
   const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
   return `${y}-${m}-${d}`;
@@ -203,6 +202,7 @@ function logout(confirmFirst=true){
   if(confirmFirst&&!confirm('Sign out?'))return;
   state.token='';state.user=null;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
 }
+
 const TRACKER_START_DATE = '2026-08-10';
 
 function isSundayDate(date) {
