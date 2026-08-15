@@ -203,7 +203,7 @@ function logout(confirmFirst=true){
   state.token='';state.user=null;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
 }
 
-const TRACKER_START_DATE = '2026-08-10';
+const TRACKER_START_DATE = '2026-08-15';
 
 function isSundayDate(date) {
   const [year, month, day] = String(date).split('-').map(Number);
@@ -397,46 +397,6 @@ function isWorkDateFinished(date) {
   return !!attendanceFor(state.user.id, date)?.finishedAt;
 }
 
-function canSelectWorkDate(date) {
-  if (!date) return false;
-
-  const today = localDate();
-
-  // Never allow future dates.
-  if (date > today) return false;
-
-  // Sunday is always OFF.
-  if (isSundayDate(date)) return false;
-
-  // Past dates can be selected so unfinished work can be completed.
-  if (date < today) return true;
-
-  // Today is available only when the previous required workday is finished.
-  const previousDate = previousRequiredWorkDate(date);
-
-  if (!previousDate) return true;
-
-  return isWorkDateFinished(previousDate);
-}
-
-function changeWorkDate(value) {
-  const selected = value || localDate();
-
-  if (!canSelectWorkDate(selected)) {
-    toast(
-      isSundayDate(selected)
-        ? 'Sunday is an OFF day.'
-        : 'Finish the previous workday before starting this date.',
-      'err'
-    );
-    return;
-  }
-
-  state.workDate = selected;
-  renderApp();
-}
-
-
 /* =========================
    ADD YOUR TASK
    DAILY 1-3-5 FLOW
@@ -447,7 +407,11 @@ const HUDDLE_STAGES = {
     min: 1,
     max: 1,
     durations: [
-      { value: 5.25, label: '5 hours 15 minutes' }
+      { value: 4, label: '4 hours' },
+      { value: 4.5, label: '4 hours 30 minutes' },
+      { value: 5, label: '5 hours' },
+      { value: 5.5, label: '5 hours 30 minutes' },
+      { value: 6, label: '6 hours' }
     ]
   },
 
@@ -455,7 +419,9 @@ const HUDDLE_STAGES = {
     min: 3,
     max: 5,
     durations: [
-      { value: 0.5, label: '30 minutes' }
+      { value: 0.5, label: '30 minutes' },
+      { value: 2 / 3, label: '40 minutes' },
+      { value: 0.75, label: '45 minutes' }
     ]
   },
 
@@ -463,7 +429,9 @@ const HUDDLE_STAGES = {
     min: 5,
     max: 7,
     durations: [
-      { value: 0.25, label: '15 minutes' }
+      { value: 0.25, label: '15 minutes' },
+      { value: 1 / 3, label: '20 minutes' },
+      { value: 5 / 12, label: '25 minutes' }
     ]
   }
 };
