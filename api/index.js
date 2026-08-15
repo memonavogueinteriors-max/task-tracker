@@ -26,24 +26,31 @@ function cleanText(value, max = 500) {
 function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 }
+const TRACKER_START_DATE = '2026-08-15';
+
 function previousRequiredWorkDate(date) {
+  if (!date || date <= TRACKER_START_DATE) return null;
+
   const [year, month, day] = String(date).split('-').map(Number);
   const current = new Date(Date.UTC(year, month - 1, day));
-
-  // Sunday is an OFF day.
-  // Monday checks Saturday.
-  // Other days check the immediately previous day.
   const dayOfWeek = current.getUTCDay();
 
+  // Sunday is an OFF day.
   if (dayOfWeek === 0) return null;
 
+  // Monday checks the previous Saturday.
   if (dayOfWeek === 1) {
     current.setUTCDate(current.getUTCDate() - 2);
   } else {
     current.setUTCDate(current.getUTCDate() - 1);
   }
 
-  return current.toISOString().slice(0, 10);
+  const previousDate = current.toISOString().slice(0, 10);
+
+  // Never require a workday before the tracker start date.
+  if (previousDate < TRACKER_START_DATE) return null;
+
+  return previousDate;
 }
 function validTime(value) {
   return value === null || value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value));
@@ -467,21 +474,15 @@ if (!['High', 'Medium', 'Low'].includes(priority)) {
   });
 }
 
-if (priority === 'High' && hours !== 5.25) {
-  return send(res, 400, {
-    error: 'High priority task duration must be 5 hours 15 minutes.'
-  });
-}
+const allowedDurations = {
+  High: [4, 4.5, 5, 5.5, 6],
+  Medium: [0.5, 2 / 3, 0.75],
+  Low: [0.25, 1 / 3, 5 / 12]
+};
 
-if (priority === 'Medium' && hours !== 0.5) {
+if (!allowedDurations[priority].some(value => Math.abs(hours - value) < 0.000001)) {
   return send(res, 400, {
-    error: 'Medium priority task duration must be 30 minutes.'
-  });
-}
-
-if (priority === 'Low' && hours !== 0.25) {
-  return send(res, 400, {
-    error: 'Low priority task duration must be 15 minutes.'
+    error: `Invalid ${priority} priority task duration.`
   });
 }
 
@@ -547,7 +548,66 @@ async function handleUpdateTask(req, res, db, actor) {
   }
   if (req.body?.hours !== undefined) {
     patch.hours = Number(req.body.hours);
-    if (!Number.isFinite(patch.hours) || patch.hours < 0 || patch.hours > 24) return send(res, 400, { error: 'Hours must be between 0 and 24.' });
+
+    if (!Number.isFinite(patch.hours) || patch.hours < 0 || patch.hours > 24) {
+      return send(res, 400, {
+        error: 'Hours must be between 0 and 24.'
+      });
+    }
+
+    const taskPriority = cleanText(
+      req.body?.priority,
+      20
+    ) || existing.priority || 'Medium';
+
+    const allowedDurations = {
+      High: [4, 4.5, 5, 5.5, 6],
+      Medium: [0.5, 2 / 3, 0.75],
+      Low: [0.25, 1 / 3, 5 / 12]
+    };
+
+    if (!allowedDurations[taskPriority]) {
+      return send(res, 400, {
+        error: 'Invalid task priority.'
+      });
+    }
+
+    if (!allowedDurations[taskPriority].some(
+      value => Math.abs(patch.hours - value) < 0.000001
+    )) {
+      return send(res, 400, {
+        error: `Invalid ${taskPriority} priority task duration.`
+      });
+    }
+  }
+
+  if (req.body?.priority !== undefined) {
+    patch.priority = cleanText(req.body.priority, 20);
+
+    if (!['High', 'Medium', 'Low'].includes(patch.priority)) {
+      return send(res, 400, {
+        error: 'Invalid task priority.'
+      });
+    }
+
+    const effectiveHours =
+      req.body?.hours !== undefined
+        ? Number(req.body.hours)
+        : Number(existing.hours);
+
+    const allowedDurations = {
+      High: [4, 4.5, 5, 5.5, 6],
+      Medium: [0.5, 2 / 3, 0.75],
+      Low: [0.25, 1 / 3, 5 / 12]
+    };
+
+    if (!allowedDurations[patch.priority].some(
+      value => Math.abs(effectiveHours - value) < 0.000001
+    )) {
+      return send(res, 400, {
+        error: `Invalid ${patch.priority} priority task duration.`
+      });
+    }
   }
   if (req.body?.status !== undefined) {
     patch.status = cleanText(req.body.status, 30);
@@ -788,3 +848,6 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: 'Server error. Check Vercel Function Logs.', detail: process.env.NODE_ENV === 'development' ? String(error) : undefined });
   }
 };
+
+
+

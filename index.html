@@ -229,28 +229,39 @@ function isWorkDateFinished(date) {
 function getUnlockedWorkDate() {
   const today = localDate();
 
+  // Tracker has not started yet.
   if (today < TRACKER_START_DATE) {
     return TRACKER_START_DATE;
   }
 
   let cursor = TRACKER_START_DATE;
 
+  // Find the first unfinished required workday.
+  // Never unlock a future date.
   for (let i = 0; i < 370; i++) {
+
+    // Sunday is an OFF day.
     if (isSundayDate(cursor)) {
       cursor = nextWorkDate(cursor);
       continue;
     }
 
+    // Do not unlock anything after today.
+    if (cursor > today) {
+      return today;
+    }
+
+    // The first unfinished day is the ONLY unlocked day.
     if (!isWorkDateFinished(cursor)) {
       return cursor;
     }
 
+    // Finished ? move to the next required workday.
     cursor = nextWorkDate(cursor);
   }
 
-  return TRACKER_START_DATE;
+  return today;
 }
-
 function setUnlockedWorkDate() {
   if (!state.user?.id) return;
 
@@ -1302,3 +1313,5 @@ window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await l
 </script>
 </body>
 </html>
+
+
