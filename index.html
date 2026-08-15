@@ -67,7 +67,6 @@
     .field-inline select{border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;background:#fff;color:var(--text)}
     .optional{font-size:10px;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600}
     .huddle-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
-    .huddle-rule{font-size:11px;color:var(--muted);font-weight:700}
     @media(max-width:760px){
       .huddle-row-head{align-items:flex-start;flex-direction:column}
       .field-inline{width:100%;justify-content:space-between}
@@ -555,17 +554,6 @@ function huddlePriorityTitle(priority) {
   return 'Low Priority';
 }
 
-function huddleDurationRule(priority) {
-  if (priority === 'High') {
-    return '1 task &#183; 4&#8211;6 hours';
-  }
-
-  if (priority === 'Medium') {
-    return '3&#8211;5 tasks &#183; 30&#8211;45 minutes each';
-  }
-
-  return '5&#8211;7 tasks &#183; 15&#8211;25 minutes each';
-}
 function renderHuddleSection(priority) {
   ensureHuddleRows(priority);
 
@@ -587,7 +575,6 @@ function renderHuddleSection(priority) {
       <div class="card-head huddle-header">
         <div>
           <h3>${esc(huddlePriorityTitle(priority))}</h3>
-          <p>${esc(huddleDurationRule(priority))}</p>
         </div>
 
         <span class="huddle-stage-badge ${headingClass}">
@@ -748,10 +735,6 @@ function renderHuddleSection(priority) {
 
       <div class="huddle-actions">
 
-        <span class="huddle-rule">
-          ${esc(huddleDurationRule(priority))}
-        </span>
-
         ${
           saved
             ? `
@@ -787,10 +770,6 @@ function renderAddTaskCard() {
 
         <div>
           <h3>? Add Your Tasks</h3>
-          <p>
-            Add High, Medium and Low priority tasks in any order.
-            All three sections are available on this page.
-          </p>
         </div>
 
       </div>
