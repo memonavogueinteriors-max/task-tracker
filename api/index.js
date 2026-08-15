@@ -850,6 +850,7 @@ module.exports = async function handler(req, res) {
     return send(res, 404, { error: 'Unknown API action.' });
   } catch (error) {
     console.error(error);
-    return send(res, 500, { error: 'Server error. Check Vercel Function Logs.', detail: process.env.NODE_ENV === 'development' ? String(error) : undefined });
+    return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
+
