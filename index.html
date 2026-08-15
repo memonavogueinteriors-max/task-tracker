@@ -448,28 +448,30 @@ const HUDDLE_STAGES = {
 };
 
 let huddleRows = {
-  priority: 'High',
-  rows: []
+  High: [],
+  Medium: [],
+  Low: []
 };
 
+let huddleSaved = {
+  High: false,
+  Medium: false,
+  Low: false
+};
 
 function huddleConfig(priority) {
   return HUDDLE_STAGES[priority] || HUDDLE_STAGES.High;
 }
 
-
 function huddleDurationOptions(priority) {
   return huddleConfig(priority).durations;
 }
-
 
 function huddleToday() {
   return state.workDate || TRACKER_START_DATE;
 }
 
-
 function defaultHuddleRow(priority) {
-
   const options = huddleDurationOptions(priority);
 
   return {
@@ -478,590 +480,365 @@ function defaultHuddleRow(priority) {
     status: 'Pending',
     notes: ''
   };
-
 }
 
-
-function ensureHuddleRows(priority = huddleRows.priority) {
-
+function ensureHuddleRows(priority) {
   const config = huddleConfig(priority);
 
-  if (!Array.isArray(huddleRows.rows)) {
-    huddleRows.rows = [];
+  if (!Array.isArray(huddleRows[priority])) {
+    huddleRows[priority] = [];
   }
 
-  while (huddleRows.rows.length < config.min) {
-    huddleRows.rows.push(
+  while (huddleRows[priority].length < config.min) {
+    huddleRows[priority].push(
       defaultHuddleRow(priority)
     );
   }
 
-  if (huddleRows.rows.length > config.max) {
-    huddleRows.rows =
-      huddleRows.rows.slice(0, config.max);
+  if (huddleRows[priority].length > config.max) {
+    huddleRows[priority] =
+      huddleRows[priority].slice(0, config.max);
   }
-
 }
 
+function ensureAllHuddleRows() {
+  ensureHuddleRows('High');
+  ensureHuddleRows('Medium');
+  ensureHuddleRows('Low');
+}
 
-function updateHuddleField(index, field, value) {
-
-  if (!huddleRows.rows[index]) {
+function updateHuddleField(priority, index, field, value) {
+  if (!huddleRows[priority]?.[index]) {
     return;
   }
 
-  huddleRows.rows[index][field] = value;
-
+  huddleRows[priority][index][field] = value;
 }
 
+function addHuddleRow(priority) {
+  const config = huddleConfig(priority);
 
-function addHuddleRow() {
-
-  const config =
-    huddleConfig(huddleRows.priority);
-
-  if (
-    huddleRows.rows.length >=
-    config.max
-  ) {
-
+  if (huddleSaved[priority]) {
     return toast(
-      `Maximum ${config.max} ${huddleRows.priority} tasks allowed.`,
+      `${priority} tasks are already saved.`,
       'err'
     );
-
   }
 
-  /*
-    IMPORTANT:
-    Do NOT call renderApp() here.
+  if (!Array.isArray(huddleRows[priority])) {
+    huddleRows[priority] = [];
+  }
 
-    The new row is added directly to the existing
-    Huddle DOM so the text already typed into
-    previous rows cannot disappear.
-  */
+  if (huddleRows[priority].length >= config.max) {
+    return toast(
+      `Maximum ${config.max} ${priority} tasks allowed.`,
+      'err'
+    );
+  }
 
-  huddleRows.rows.push(
-    defaultHuddleRow(huddleRows.priority)
+  huddleRows[priority].push(
+    defaultHuddleRow(priority)
   );
 
-  const list =
-    document.querySelector('.huddle-list');
-
-  if (!list) {
-    return;
-  }
-
-  const index =
-    huddleRows.rows.length - 1;
-
-  const row =
-    huddleRows.rows[index];
-
-  const durationOptions =
-    huddleDurationOptions(
-      huddleRows.priority
-    );
-
-  const article =
-    document.createElement('article');
-
-  article.className =
-    'huddle-row';
-
-  article.innerHTML = `
-    <div class="huddle-row-head">
-
-      <strong>
-        ${esc(huddleRows.priority)}
-        Task ${index + 1}
-      </strong>
-
-      <div class="field-inline">
-
-        <label>Status</label>
-
-        <select
-          onchange="updateHuddleField(${index},'status',this.value)"
-        >
-
-          ${[
-            'Pending',
-            'In Progress',
-            'Completed',
-            'On Hold',
-            'Review'
-          ].map(status => `
-            <option value="${esc(status)}">
-              ${esc(status)}
-            </option>
-          `).join('')}
-
-        </select>
-
-      </div>
-
-    </div>
-
-
-    <div class="form-grid">
-
-      <div class="field wide">
-
-        <label>
-          Task Name
-        </label>
-
-        <input
-          type="text"
-          placeholder="Enter task name"
-          autocomplete="off"
-          oninput="
-            updateHuddleField(
-              ${index},
-              'title',
-              this.value
-            )
-          "
-        >
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Duration
-        </label>
-
-        <select
-          onchange="
-            updateHuddleField(
-              ${index},
-              'hours',
-              Number(this.value)
-            )
-          "
-        >
-
-          ${durationOptions.map(option => `
-            <option value="${option.value}">
-              ${esc(option.label)}
-            </option>
-          `).join('')}
-
-        </select>
-
-      </div>
-
-
-      <div class="field wide">
-
-        <label>
-          Notes
-          <span class="optional">
-            (Optional)
-          </span>
-        </label>
-
-        <input
-          type="text"
-          placeholder="Optional notes"
-          autocomplete="off"
-          oninput="
-            updateHuddleField(
-              ${index},
-              'notes',
-              this.value
-            )
-          "
-        >
-
-      </div>
-
-    </div>
-  `;
-
-  list.appendChild(article);
-
-  /*
-    Keep the Add Task button at the bottom.
-  */
-
-  const addButton =
-    document.querySelector(
-      '.huddle-add-task'
-    );
-
-  if (addButton) {
-
-    addButton.remove();
-
-  }
-
-  if (
-    huddleRows.rows.length <
-    config.max
-  ) {
-
-    const button =
-      document.createElement('button');
-
-    button.type = 'button';
-
-    button.className =
-      'btn btn-light huddle-add-task';
-
-    button.textContent =
-      '+ Click to Add Task';
-
-    button.onclick =
-      addHuddleRow;
-
-    list.parentElement.insertBefore(
-      button,
-      list.nextSibling
-    );
-
-  }
-
+  renderApp();
 }
 
-
-function huddleNextPriority(priority) {
-
+function huddlePriorityTitle(priority) {
   if (priority === 'High') {
-    return 'Medium';
+    return 'High Priority';
   }
 
   if (priority === 'Medium') {
-    return 'Low';
+    return 'Medium Priority';
   }
 
-  return null;
-
+  return 'Low Priority';
 }
-
-
-function huddlePriorityLabel(priority) {
-
-  if (priority === 'High') {
-    return '1 High Priority Task';
-  }
-
-  if (priority === 'Medium') {
-    return '3â€“5 Medium Priority Tasks';
-  }
-
-  return '5â€“7 Low Priority Tasks';
-
-}
-
 
 function huddleDurationRule(priority) {
-
   if (priority === 'High') {
-    return '4â€“6 hours';
+    return '1 task · 4–6 hours';
   }
 
   if (priority === 'Medium') {
-    return '30â€“40 minutes';
+    return '3–5 tasks · 30–45 minutes each';
   }
 
-  return '15â€“25 minutes';
-
+  return '5–7 tasks · 15–25 minutes each';
 }
 
+function renderHuddleSection(priority) {
+  ensureHuddleRows(priority);
 
-function renderAddTaskCard() {
+  const config = huddleConfig(priority);
+  const rows = huddleRows[priority];
+  const saved = huddleSaved[priority];
+  const durationOptions = huddleDurationOptions(priority);
 
-  ensureHuddleRows();
-
-  const priority =
-    huddleRows.priority;
-
-  const config =
-    huddleConfig(priority);
-
-  const durationOptions =
-    huddleDurationOptions(priority);
-
-  const today =
-    huddleToday();
-
+  const headingClass =
+    priority === 'High'
+      ? 'huddle-stage-high'
+      : priority === 'Medium'
+        ? 'huddle-stage-medium'
+        : 'huddle-stage-low';
 
   return `
+    <section class="card huddle-card">
 
-<section class="card huddle-card">
-
-  <div class="card-head huddle-header">
-
-    <div>
-
-      <h3>âž• Add Your Task</h3>
-
-    </div>
-
-
-
-  </div>
-
-
-  <div class="huddle-current-stage">
-
-
-  </div>
-
-
-  <div class="huddle-list">
-
-    ${huddleRows.rows.map((row, i) => `
-
-      <article class="huddle-row">
-
-        <div class="huddle-row-head">
-
-          <strong>
-            ${esc(priority)}
-            Task ${i + 1}
-          </strong>
-
-
-          <div class="field-inline">
-
-            <label>
-              Status
-            </label>
-
-            <select
-              onchange="
-                updateHuddleField(
-                  ${i},
-                  'status',
-                  this.value
-                )
-              "
-            >
-
-              ${[
-                'Pending',
-                'In Progress',
-                'Completed',
-                'On Hold',
-                'Review'
-              ].map(status => `
-
-                <option
-                  value="${esc(status)}"
-                  ${
-                    row.status === status
-                      ? 'selected'
-                      : ''
-                  }
-                >
-                  ${esc(status)}
-                </option>
-
-              `).join('')}
-
-            </select>
-
-          </div>
-
+      <div class="card-head huddle-header">
+        <div>
+          <h3>${esc(huddlePriorityTitle(priority))}</h3>
+          <p>${esc(huddleDurationRule(priority))}</p>
         </div>
 
+        <span class="huddle-stage-badge ${headingClass}">
+          ${saved ? 'Saved' : priority}
+        </span>
+      </div>
 
-        <div class="form-grid">
+      <div class="huddle-list">
 
+        ${rows.map((row, i) => `
+          <article class="huddle-row">
 
-          <div class="field wide">
+            <div class="huddle-row-head">
 
-            <label>
-              Task Name
-            </label>
+              <strong>
+                ${esc(priority)} Task ${i + 1}
+              </strong>
 
-            <input
-              type="text"
-              value="${esc(row.title)}"
-              placeholder="Enter task name"
-              autocomplete="off"
-              oninput="
-                updateHuddleField(
-                  ${i},
-                  'title',
-                  this.value
-                )
-              "
-              required
-            >
+              <div class="field-inline">
 
-          </div>
+                <label>Status</label>
 
-
-          <div class="field">
-
-            <label>
-              Duration
-            </label>
-
-            <select
-              onchange="
-                updateHuddleField(
-                  ${i},
-                  'hours',
-                  Number(this.value)
-                )
-              "
-              required
-            >
-
-              ${durationOptions.map(option => `
-
-                <option
-                  value="${option.value}"
-                  ${
-                    Number(row.hours) ===
-                    Number(option.value)
-                      ? 'selected'
-                      : ''
-                  }
+                <select
+                  ${saved ? 'disabled' : ''}
+                  onchange="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'status',
+                      this.value
+                    )
+                  "
                 >
-                  ${esc(option.label)}
-                </option>
 
-              `).join('')}
+                  ${[
+                    'Pending',
+                    'In Progress',
+                    'Completed',
+                    'On Hold',
+                    'Review'
+                  ].map(status => `
+                    <option
+                      value="${esc(status)}"
+                      ${row.status === status ? 'selected' : ''}
+                    >
+                      ${esc(status)}
+                    </option>
+                  `).join('')}
 
-            </select>
+                </select>
 
-          </div>
+              </div>
 
+            </div>
 
-          <div class="field wide">
+            <div class="form-grid">
 
-            <label>
-              Notes
-              <span class="optional">
-                (Optional)
-              </span>
-            </label>
+              <div class="field wide">
 
-            <input
-              type="text"
-              value="${esc(row.notes)}"
-              placeholder="Optional notes"
-              autocomplete="off"
-              oninput="
-                updateHuddleField(
-                  ${i},
-                  'notes',
-                  this.value
-                )
-              "
-            >
+                <label>Task Name</label>
 
-          </div>
+                <input
+                  type="text"
+                  value="${esc(row.title)}"
+                  placeholder="Enter task name"
+                  autocomplete="off"
+                  ${saved ? 'disabled' : ''}
+                  oninput="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'title',
+                      this.value
+                    )
+                  "
+                >
 
+              </div>
 
-        </div>
+              <div class="field">
 
-      </article>
+                <label>Duration</label>
 
-    `).join('')}
+                <select
+                  ${saved ? 'disabled' : ''}
+                  onchange="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'hours',
+                      Number(this.value)
+                    )
+                  "
+                >
 
-  </div>
+                  ${durationOptions.map(option => `
+                    <option
+                      value="${option.value}"
+                      ${
+                        Number(row.hours) === Number(option.value)
+                          ? 'selected'
+                          : ''
+                      }
+                    >
+                      ${esc(option.label)}
+                    </option>
+                  `).join('')}
 
+                </select>
 
-  ${
-    huddleRows.rows.length < config.max
-      ? `
-        <button
-          type="button"
-          class="btn btn-light huddle-add-task"
-          onclick="addHuddleRow()"
-        >
-          + Click to Add Task
-        </button>
-      `
-      : ''
-  }
+              </div>
 
+              <div class="field wide">
 
-  <div class="huddle-actions">
+                <label>
+                  Notes
+                  <span class="optional">(Optional)</span>
+                </label>
 
-    <span class="huddle-rule">
+                <input
+                  type="text"
+                  value="${esc(row.notes)}"
+                  placeholder="Optional notes"
+                  autocomplete="off"
+                  ${saved ? 'disabled' : ''}
+                  oninput="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'notes',
+                      this.value
+                    )
+                  "
+                >
+
+              </div>
+
+            </div>
+
+          </article>
+        `).join('')}
+
+      </div>
 
       ${
-        priority === 'High'
-          ? '1 task Â· 4â€“6 hours'
-          : priority === 'Medium'
-            ? '3â€“5 tasks Â· 30â€“40 minutes each'
-            : '5â€“7 tasks Â· 15â€“25 minutes each'
+        !saved && rows.length < config.max
+          ? `
+            <button
+              type="button"
+              class="btn btn-light huddle-add-task"
+              onclick="addHuddleRow('${priority}')"
+            >
+              + Add ${esc(priority)} Task
+            </button>
+          `
+          : ''
       }
 
-    </span>
+      <div class="huddle-actions">
 
+        <span class="huddle-rule">
+          ${esc(huddleDurationRule(priority))}
+        </span>
 
-    <button
-      type="button"
-      class="btn btn-primary"
-      onclick="saveHuddleTasks()"
-      ${state.busy ? 'disabled' : ''}
-    >
-      Save ${esc(priority)} Tasks
-    </button>
+        ${
+          saved
+            ? `
+              <span class="pill p-completed">
+                ${esc(priority)} Tasks Saved
+              </span>
+            `
+            : `
+              <button
+                type="button"
+                class="btn btn-primary"
+                onclick="saveHuddleTasks('${priority}')"
+                ${state.busy ? 'disabled' : ''}
+              >
+                Save ${esc(priority)} Tasks
+              </button>
+            `
+        }
 
-  </div>
+      </div>
 
-
-</section>
-
-`;
-
+    </section>
+  `;
 }
 
+function renderAddTaskCard() {
+  ensureAllHuddleRows();
 
-async function saveHuddleTasks() {
+  return `
+    <section class="card huddle-card">
 
-  ensureHuddleRows();
+      <div class="card-head huddle-header">
 
-  const priority =
-    huddleRows.priority;
+        <div>
+          <h3>? Add Your Tasks</h3>
+          <p>
+            Add High, Medium and Low priority tasks in any order.
+            All three sections are available on this page.
+          </p>
+        </div>
 
-  const config =
-    huddleConfig(priority);
+      </div>
 
-  const rows =
-    huddleRows.rows;
+    </section>
 
+    ${renderHuddleSection('High')}
+    ${renderHuddleSection('Medium')}
+    ${renderHuddleSection('Low')}
+  `;
+}
+
+async function saveHuddleTasks(priority) {
+
+  if (!['High', 'Medium', 'Low'].includes(priority)) {
+    return toast(
+      'Invalid task priority.',
+      'err'
+    );
+  }
+
+  if (huddleSaved[priority]) {
+    return toast(
+      `${priority} tasks are already saved.`,
+      'err'
+    );
+  }
+
+  ensureHuddleRows(priority);
+
+  const config = huddleConfig(priority);
+  const rows = huddleRows[priority];
 
   if (rows.length < config.min) {
-
     return toast(
       `Minimum ${config.min} ${priority} task${config.min === 1 ? '' : 's'} required.`,
       'err'
     );
-
   }
-
 
   const allowedDurations =
     huddleDurationOptions(priority)
       .map(option => Number(option.value));
 
+  for (let i = 0; i < rows.length; i++) {
 
-  /*
-    Validate EVERYTHING before sending
-    anything to the database.
-  */
-
-  for (
-    let i = 0;
-    i < rows.length;
-    i++
-  ) {
-
-    const row =
-      rows[i];
+    const row = rows[i];
 
     const title =
       String(row.title || '').trim();
@@ -1069,16 +846,12 @@ async function saveHuddleTasks() {
     const hours =
       Number(row.hours);
 
-
     if (!title) {
-
       return toast(
         `${priority} Task ${i + 1}: Task name is required.`,
         'err'
       );
-
     }
-
 
     if (
       !allowedDurations.some(
@@ -1086,14 +859,11 @@ async function saveHuddleTasks() {
           Math.abs(value - hours) < 0.000001
       )
     ) {
-
       return toast(
         `${priority} Task ${i + 1}: Select a valid duration.`,
         'err'
       );
-
     }
-
 
     if (
       ![
@@ -1104,107 +874,46 @@ async function saveHuddleTasks() {
         'Review'
       ].includes(row.status)
     ) {
-
       return toast(
         `${priority} Task ${i + 1}: Select a valid status.`,
         'err'
       );
-
     }
-
   }
-
 
   state.busy = true;
 
-
   try {
 
-    const taskDate =
-      huddleToday();
+    const taskDate = huddleToday();
 
-
-    for (
-      const row of rows
-    ) {
+    for (const row of rows) {
 
       await api(
         'task.create',
         {
           method: 'POST',
-
           body: {
-
-            memberId:
-              state.user.id,
-
-            title:
-              String(row.title).trim(),
-
+            memberId: state.user.id,
+            title: String(row.title).trim(),
             taskDate,
-
-            hours:
-              Number(row.hours),
-
+            hours: Number(row.hours),
             priority,
-
-            status:
-              row.status,
-
-            notes:
-              String(row.notes || '').trim()
-
+            status: row.status,
+            notes: String(row.notes || '').trim()
           }
-
         }
       );
 
     }
 
+    huddleSaved[priority] = true;
 
-    const next =
-      huddleNextPriority(priority);
-
-
-    if (next) {
-
-      huddleRows = {
-
-        priority: next,
-
-        rows: []
-
-      };
-
-      ensureHuddleRows(next);
-
-
-      toast(
-        `${priority} tasks saved. Next: ${next} priority.`
-      );
-
-    } else {
-
-      huddleRows = {
-
-        priority: 'High',
-
-        rows: []
-
-      };
-
-      ensureHuddleRows('High');
-
-
-      toast(
-        'All 1-3-5 tasks saved successfully.'
-      );
-
-    }
-
+    toast(
+      `${priority} tasks saved successfully.`
+    );
 
     await loadData(false);
-
 
   } catch (e) {
 
@@ -1218,10 +927,7 @@ async function saveHuddleTasks() {
     state.busy = false;
 
   }
-
 }
-
-
 async function saveAttendance(type){
   const input=document.getElementById(type==='login'?'loginTime':'logoutTime'); if(!input?.value)return toast('Select a time first.','err');state.busy=true;
   try{await api('attendance.save',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate,[type==='login'?'loginTime':'logoutTime']:input.value}});toast(`${type==='login'?'Login':'Logout'} time saved.`);await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
@@ -1313,5 +1019,6 @@ window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await l
 </script>
 </body>
 </html>
+
 
 
