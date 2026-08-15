@@ -557,16 +557,15 @@ function huddlePriorityTitle(priority) {
 
 function huddleDurationRule(priority) {
   if (priority === 'High') {
-    return '1 task · 4–6 hours';
+    return '1 task &#183; 4&#8211;6 hours';
   }
 
   if (priority === 'Medium') {
-    return '3–5 tasks · 30–45 minutes each';
+    return '3&#8211;5 tasks &#183; 30&#8211;45 minutes each';
   }
 
-  return '5–7 tasks · 15–25 minutes each';
+  return '5&#8211;7 tasks &#183; 15&#8211;25 minutes each';
 }
-
 function renderHuddleSection(priority) {
   ensureHuddleRows(priority);
 
@@ -1019,6 +1018,3 @@ window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await l
 </script>
 </body>
 </html>
-
-
-
