@@ -369,13 +369,18 @@ async function handleCreateMember(req, res, db, actor) {
     if (error.code === '23505') return send(res, 409, { error: 'That Employee ID already exists.' });
     throw error;
   }
-  await notify(db, {
-    companyId: actor.company_id,
-    recipientId: data.id,
-    senderId: actor.id,
-    type: 'system',
-    message: `Welcome to the team, ${data.name}.`
-  });
+  try {
+    await notify(db, {
+      companyId: actor.company_id,
+      recipientId: data.id,
+      senderId: actor.id,
+      type: 'system',
+      message: `Welcome to the team, ${data.name}.`
+    });
+  } catch (notificationError) {
+    console.error('Member created, but welcome notification failed:', notificationError);
+  }
+
   return send(res, 201, { member: publicMember(data) });
 }
 
@@ -848,6 +853,3 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: 'Server error. Check Vercel Function Logs.', detail: process.env.NODE_ENV === 'development' ? String(error) : undefined });
   }
 };
-
-
-
