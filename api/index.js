@@ -444,11 +444,6 @@ async function handleCreateTask(req, res, db, actor) {
 const [taskYear, taskMonth, taskDay] = date.split('-').map(Number);
 const taskDateObject = new Date(Date.UTC(taskYear, taskMonth - 1, taskDay));
 
-if (taskDateObject.getUTCDay() === 0) {
-  return send(res, 409, {
-    error: 'Sunday is an OFF day. Tasks cannot be added on Sunday.'
-  });
-}
 const previousDate = previousRequiredWorkDate(date);
 
 if (previousDate) {
@@ -632,12 +627,6 @@ async function handleUpdateTask(req, res, db, actor) {
   const taskDateObject = new Date(
     Date.UTC(taskYear, taskMonth - 1, taskDay)
   );
-
-  if (taskDateObject.getUTCDay() === 0) {
-    return send(res, 409, {
-      error: 'Sunday is an OFF day. Tasks cannot be added on Sunday.'
-    });
-  }
 
   const previousDate = previousRequiredWorkDate(patch.task_date);
 
@@ -853,4 +842,3 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
-

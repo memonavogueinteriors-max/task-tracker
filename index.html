@@ -228,34 +228,35 @@ function isWorkDateFinished(date) {
 function getUnlockedWorkDate() {
   const today = localDate();
 
-  // Tracker has not started yet.
   if (today < TRACKER_START_DATE) {
     return TRACKER_START_DATE;
   }
 
   let cursor = TRACKER_START_DATE;
 
-  // Find the first unfinished required workday.
-  // Never unlock a future date.
+  /*
+    Sunday is optional.
+    It may be opened and used, but it is never required
+    before Monday.
+  */
   for (let i = 0; i < 370; i++) {
 
-    // Sunday is an OFF day.
+    if (cursor > today) {
+      return today;
+    }
+
+    // Sunday is optional, so skip it when finding
+    // the next REQUIRED workday.
     if (isSundayDate(cursor)) {
       cursor = nextWorkDate(cursor);
       continue;
     }
 
-    // Do not unlock anything after today.
-    if (cursor > today) {
-      return today;
-    }
-
-    // The first unfinished day is the ONLY unlocked day.
+    // First unfinished required workday.
     if (!isWorkDateFinished(cursor)) {
       return cursor;
     }
 
-    // Finished ? move to the next required workday.
     cursor = nextWorkDate(cursor);
   }
 
@@ -300,12 +301,15 @@ function canSelectWorkDate(date) {
   if (!date) return false;
   if (date < TRACKER_START_DATE) return false;
   if (date > localDate()) return false;
-  if (isSundayDate(date)) return false;
 
-  // Only the current sequentially unlocked workday is selectable.
+  // Sunday is optional and can always be opened when it is today.
+  if (isSundayDate(date)) {
+    return date === localDate();
+  }
+
+  // Other dates follow the sequential required-workday rule.
   return date === getUnlockedWorkDate();
 }
-
 function changeWorkDate(value) {
   const selected = value || localDate();
   const unlocked = getUnlockedWorkDate();
@@ -314,7 +318,7 @@ function changeWorkDate(value) {
     if (selected < TRACKER_START_DATE) {
       toast('Task Tracker starts from Monday, 10 August 2026.', 'err');
     } else if (isSundayDate(selected)) {
-      toast('Sunday is an OFF day.', 'err');
+      toast('Sunday is optional. You can add tasks or skip it.', 'err');
     } else if (selected > unlocked) {
       toast(`Finish ${formatDate(unlocked)} before starting ${formatDate(selected)}.`, 'err');
     } else {
