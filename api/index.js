@@ -444,24 +444,6 @@ async function handleCreateTask(req, res, db, actor) {
 const [taskYear, taskMonth, taskDay] = date.split('-').map(Number);
 const taskDateObject = new Date(Date.UTC(taskYear, taskMonth - 1, taskDay));
 
-const previousDate = previousRequiredWorkDate(date);
-
-if (previousDate) {
-  const { data: previousAttendance, error: previousAttendanceError } = await db
-    .from('attendance')
-    .select('finished_at')
-    .eq('member_id', memberId)
-    .eq('work_date', previousDate)
-    .maybeSingle();
-
-  if (previousAttendanceError) throw previousAttendanceError;
-
-  if (!previousAttendance?.finished_at) {
-    return send(res, 409, {
-      error: `You must finish ${previousDate} before adding tasks for ${date}.`
-    });
-  }
-}
   if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
   return send(res, 400, {
     error: 'Hours must be between 0 and 24.'
@@ -628,25 +610,6 @@ async function handleUpdateTask(req, res, db, actor) {
     Date.UTC(taskYear, taskMonth - 1, taskDay)
   );
 
-  const previousDate = previousRequiredWorkDate(patch.task_date);
-
-  if (previousDate) {
-    const { data: previousAttendance, error: previousAttendanceError } =
-      await db
-        .from('attendance')
-        .select('finished_at')
-        .eq('member_id', existing.member_id)
-        .eq('work_date', previousDate)
-        .maybeSingle();
-
-    if (previousAttendanceError) throw previousAttendanceError;
-
-    if (!previousAttendance?.finished_at) {
-      return send(res, 409, {
-        error: `You must finish ${previousDate} before changing this task to ${patch.task_date}.`
-      });
-    }
-  }
 }
 
   const { data, error } = await db.from('tasks').update(patch).eq('id', id).select('*').single();

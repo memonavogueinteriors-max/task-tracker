@@ -104,7 +104,38 @@ function formatDateTime(value) { if(!value) return ''; return new Date(value).to
 function memberById(id) { return state.members.find(m=>m.id===id); }
 function attendanceFor(memberId,date) { return state.attendance.find(a=>a.memberId===memberId&&a.workDate===date); }
 function tasksFor(memberId,date) { return state.tasks.filter(t=>t.memberId===memberId&&t.taskDate===date); }
-function statusPill(status) { const map={'Completed':'completed','In Progress':'progress','Pending':'pending','On Hold':'hold','Review':'review'}; return `<span class="pill p-${map[status]||'pending'}">${esc(status)}</span>`; }
+function formatTaskDuration(hours) {
+  const value = Number(hours || 0);
+
+  if (!Number.isFinite(value)) return '0 minutes';
+
+  const totalMinutes = Math.round(value * 60);
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
+  }
+
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (!minutes) {
+    return `${wholeHours} hour${wholeHours === 1 ? '' : 's'}`;
+  }
+
+  return `${wholeHours} hour${wholeHours === 1 ? '' : 's'} ${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
+function statusPill(status) {
+  const map={
+    'Completed':'completed',
+    'In Progress':'progress',
+    'Pending':'pending',
+    'On Hold':'hold',
+    'Review':'review'
+  };
+
+  return `<span class="pill p-${map[status]||'pending'}">${esc(status)}</span>`;
+}
 function rolePill(role) { return `<span class="pill p-${esc(role)}">${esc(niceRole(role))}</span>`; }
 function isOwner(){return state.user?.role==='owner'} function isManager(){return state.user?.role==='manager'} function isSales(){return state.user?.role==='sales'}
 function visibleMembers(){ return state.members; }
@@ -232,34 +263,6 @@ function getUnlockedWorkDate() {
     return TRACKER_START_DATE;
   }
 
-  let cursor = TRACKER_START_DATE;
-
-  /*
-    Sunday is optional.
-    It may be opened and used, but it is never required
-    before Monday.
-  */
-  for (let i = 0; i < 370; i++) {
-
-    if (cursor > today) {
-      return today;
-    }
-
-    // Sunday is optional, so skip it when finding
-    // the next REQUIRED workday.
-    if (isSundayDate(cursor)) {
-      cursor = nextWorkDate(cursor);
-      continue;
-    }
-
-    // First unfinished required workday.
-    if (!isWorkDateFinished(cursor)) {
-      return cursor;
-    }
-
-    cursor = nextWorkDate(cursor);
-  }
-
   return today;
 }
 function setUnlockedWorkDate() {
@@ -379,7 +382,44 @@ function renderWork(){
   value="${esc(date)}"
   max="${esc(localDate())}"
   onchange="changeWorkDate(this.value)"
-></div><div class="field"><label>Login Time</label><input id="loginTime" type="time" value="${esc(attendance?.loginTime||'09:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-green" onclick="saveAttendance('login')" ${attendance?.finishedAt?'disabled':''}>Save Login</button><div class="field"><label>Logout Time</label><input id="logoutTime" type="time" value="${esc(attendance?.logoutTime||'17:00')}" ${attendance?.finishedAt?'disabled':''}></div><button class="btn btn-danger" onclick="saveAttendance('logout')" ${attendance?.finishedAt?'disabled':''}>Save Logout</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>&#9989; Finish Day</button></div>
+></div><div class="field">
+  <label>Login Time</label>
+  <input
+    id="loginTime"
+    type="time"
+    min="09:00"
+    value="${esc(attendance?.loginTime||'09:00')}"
+    ${attendance?.finishedAt?'disabled':''}
+  >
+</div>
+
+<button
+  class="btn btn-green"
+  onclick="saveAttendance('login')"
+  ${attendance?.finishedAt?'disabled':''}
+>
+  ${attendance?.loginTime ? '? Saved Login' : 'Save Login'}
+</button>
+
+<div class="field">
+  <label>Logout Time</label>
+  <input
+    id="logoutTime"
+    type="time"
+    min="09:00"
+    max="23:59"
+    value="${esc(attendance?.logoutTime||'18:00')}"
+    ${attendance?.finishedAt?'disabled':''}
+  >
+</div>
+
+<button
+  class="btn btn-danger"
+  onclick="saveAttendance('logout')"
+  ${attendance?.finishedAt?'disabled':''}
+>
+  ${attendance?.logoutTime ? '? Saved Logout' : 'Save Logout'}
+</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>&#9989; Finish Day</button></div>
       ${attendance?.finishedAt?`<div class="success">Finished on ${esc(formatDateTime(attendance.finishedAt))}. This day is stored permanently and synced to Google Sheets.</div>`:''}
     </section>
     ${renderAddTaskCard()}
@@ -921,12 +961,39 @@ async function finishDay(){
 
 function renderTaskTable(tasks,own=false){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${Number(t.hours).toFixed(2)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
-async function updateTask(event){event.preventDefault();const f=new FormData(event.target);try{await api('task.update',{method:'PATCH',body:{id:state.editingTask.id,title:f.get('title'),taskDate:f.get('taskDate'),hours:Number(f.get('hours')),status:f.get('status'),notes:f.get('notes')}});state.modal=null;toast('Task updated and Sheet row refreshed.');await loadData(false);}catch(e){toast(e.message,'err')}}
+async function updateTask(event){
+  event.preventDefault();
 
+  const f = new FormData(event.target);
+
+  try {
+    await api('task.update',{
+      method:'PATCH',
+      body:{
+        id:state.editingTask.id,
+        title:f.get('title'),
+        taskDate:f.get('taskDate'),
+        hours:Number(f.get('hours')),
+        priority:f.get('priority'),
+        status:f.get('status'),
+        notes:f.get('notes')
+      }
+    });
+
+    state.modal = null;
+    state.editingTask = null;
+
+    toast('Task updated successfully.');
+    await loadData(false);
+
+  } catch(e) {
+    toast(e.message,'err');
+  }
+}
 function renderTeam(){
   const managers=state.members.filter(m=>m.role==='manager');
   return `<div class="page-head"><div><h2>${isOwner()?'Team Members':'My Team'}</h2><p>${isOwner()?'Create accounts, assign managers, and manage access.':'Members assigned under your management.'}</p></div>${isOwner()?`<button class="btn btn-primary" onclick="openAddMember()">+ Add Member</button>`:''}</div>
@@ -989,7 +1056,84 @@ async function sendRing(event){event.preventDefault();const f=new FormData(event
 function closeModal(){state.modal=null;state.editingTask=null;state.editingMember=null;state.ringRecipient=null;renderApp();}
 function renderModal(){
   if(!state.modal)return '';
-  if(state.modal==='task'){const t=state.editingTask;return modalWrap('Edit Task',`<form onsubmit="updateTask(event)"><div class="field"><label>Task Name</label><input name="title" value="${esc(t.title)}" required></div><div class="form-grid"><div class="field"><label>Date</label><input name="taskDate" type="date" value="${esc(t.taskDate)}" required></div><div class="field"><label>Hours</label><input name="hours" type="number" min="0" max="24" step=".25" value="${esc(t.hours)}" required></div><div class="field"><label>Status</label><select name="status">${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`<option ${t.status===s?'selected':''}>${s}</option>`).join('')}</select></div></div><div class="field"><label>Notes</label><textarea name="notes">${esc(t.notes||'')}</textarea></div><div class="actions"><button class="btn btn-light" type="button" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Save Changes</button></div></form>`)}
+  if(state.modal==='task'){
+  const t=state.editingTask;
+  const editDurations={
+    High:[
+      {value:4,label:'4 hours'},
+      {value:4.5,label:'4 hours 30 minutes'},
+      {value:5,label:'5 hours'},
+      {value:5.5,label:'5 hours 30 minutes'},
+      {value:6,label:'6 hours'}
+    ],
+    Medium:[
+      {value:0.5,label:'30 minutes'},
+      {value:2/3,label:'40 minutes'},
+      {value:0.75,label:'45 minutes'}
+    ],
+    Low:[
+      {value:0.25,label:'15 minutes'},
+      {value:1/3,label:'20 minutes'},
+      {value:5/12,label:'25 minutes'}
+    ]
+  };
+
+  const currentPriority=t.priority||'Medium';
+  const durationOptions=editDurations[currentPriority]||editDurations.Medium;
+
+  return modalWrap('Edit Task',`
+    <form onsubmit="updateTask(event)">
+      <div class="field">
+        <label>Task Name</label>
+        <input name="title" value="${esc(t.title)}" required>
+      </div>
+
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Date</label>
+          <input name="taskDate" type="date" value="${esc(t.taskDate)}" required>
+        </div>
+
+        <div class="field">
+          <label>Priority</label>
+          <select name="priority" onchange="this.form.querySelector('[name=hours]').innerHTML=({High:'<option value=&quot;4&quot;>4 hours</option><option value=&quot;4.5&quot;>4 hours 30 minutes</option><option value=&quot;5&quot;>5 hours</option><option value=&quot;5.5&quot;>5 hours 30 minutes</option><option value=&quot;6&quot;>6 hours</option>',Medium:'<option value=&quot;0.5&quot;>30 minutes</option><option value=&quot;0.6666666667&quot;>40 minutes</option><option value=&quot;0.75&quot;>45 minutes</option>',Low:'<option value=&quot;0.25&quot;>15 minutes</option><option value=&quot;0.3333333333&quot;>20 minutes</option><option value=&quot;0.4166666667&quot;>25 minutes</option>'})[this.value]">
+            ${['High','Medium','Low'].map(p=>`<option value="${p}" ${currentPriority===p?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Duration</label>
+          <select name="hours">
+            ${durationOptions.map(o=>`
+              <option value="${o.value}" ${Math.abs(Number(t.hours)-Number(o.value))<0.000001?'selected':''}>
+                ${o.label}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            ${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`<option ${t.status===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+
+      </div>
+
+      <div class="field">
+        <label>Notes</label>
+        <textarea name="notes">${esc(t.notes||'')}</textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-light" type="button" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  `);
+}
   if(state.modal==='member'){const managers=state.members.filter(m=>m.role==='manager');return modalWrap('Add Team Member',`<form onsubmit="createMember(event)"><div class="form-grid"><div class="field wide"><label>Full Name</label><input name="name" required></div><div class="field wide"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Role</label><select name="role" onchange="document.getElementById('managerField').style.display=this.value==='sales'?'flex':'none'"><option value="sales">Team Member (Sales)</option><option value="manager">Manager</option></select></div><div class="field"><label>Employee ID</label><input name="employeeId" placeholder="Auto-generated if blank"></div><div class="field"><label>PIN</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}" required></div><div class="field" id="managerField"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Create Member</button></div></form>`)}
   if(state.modal==='memberEdit'){const m=state.editingMember,managers=state.members.filter(x=>x.role==='manager'&&x.id!==m.id);return modalWrap('Manage Member',`<form onsubmit="updateMember(event)"><div class="field"><label>Name</label><input name="name" value="${esc(m.name)}" required></div><div class="field"><label>Email</label><input name="email" type="email" value="${esc(m.email||'')}"></div>${m.role==='sales'?`<div class="field"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(x=>`<option value="${x.id}" ${m.managerId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`:'<input type="hidden" name="managerId" value="">'}<div class="field"><label>New PIN (leave blank to keep current)</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}"></div><label style="display:flex;gap:8px;align-items:center;margin:10px 0 18px"><input name="active" type="checkbox" ${m.active?'checked':''}> Active account</label><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Save Member</button></div></form>`)}
   if(state.modal==='ring'){const recipients=state.members.filter(m=>m.id!==state.user.id);return modalWrap('🔔 Ring Notification',`<form onsubmit="sendRing(event)">${isSales()?`<div class="notice">This ring will be sent directly to the Owner.</div>`:`<div class="field"><label>Ring</label><select name="recipientId" required>${recipients.map(m=>`<option value="${m.id}" ${(state.ringRecipient||'')===m.id?'selected':''}>${esc(m.name)} — ${esc(m.employeeId)}</option>`).join('')}</select></div>`}<div class="field"><label>Message</label><textarea name="message" placeholder="Please check the dashboard…"></textarea></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Send Ring</button></div></form>`)}
