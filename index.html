@@ -1321,7 +1321,35 @@ async function testSheet(){try{await api('sheet.test',{method:'POST',body:{}});t
 async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
 
 function toggleNotifications(){state.notificationsOpen=!state.notificationsOpen;renderApp();if(state.notificationsOpen&&unreadCount())markNotificationsRead();}
-function renderNotifications(){return `<aside class="notification-panel"><div class="np-head"><strong>Notifications</strong><button class="btn btn-light btn-sm" onclick="markNotificationsRead()">Mark all read</button></div>${state.notifications.length?state.notifications.map(n=>`<div class="notif ${n.readAt?'':'unread'}"><strong>${n.type==='ring'?'🔔':n.type==='task'?'📋':'ℹ️'} ${esc(n.message)}</strong><time>${esc(formatDateTime(n.createdAt))}</time></div>`).join(''):`<div class="empty">No notifications.</div>`}</aside>`}
+function renderNotifications(){
+  const items = state.notifications || [];
+
+  let html =
+    '<aside class="notification-panel">' +
+      '<div class="np-head">' +
+        '<strong>Notifications</strong>' +
+        '<button class="btn btn-light btn-sm" type="button" onclick="markNotificationsRead()">Mark all read</button>' +
+      '</div>';
+
+  if(items.length){
+    html += items.map(n =>
+      '<div class="notif ' + (n.readAt ? '' : 'unread') + '">' +
+        '<strong>' +
+          (n.type === 'ring' ? '&#128276;' : n.type === 'task' ? '&#128203;' : '&#8505;') +
+          ' ' +
+          esc(n.message) +
+        '</strong>' +
+        '<time>' + esc(formatDateTime(n.createdAt)) + '</time>' +
+      '</div>'
+    ).join('');
+  }else{
+    html += '<div class="empty">No notifications.</div>';
+  }
+
+  html += '</aside>';
+
+  return html;
+}
 async function markNotificationsRead(){try{await api('notifications.read',{method:'POST',body:{ids:state.notifications.filter(n=>!n.readAt).map(n=>n.id)}});state.notifications.forEach(n=>n.readAt=n.readAt||new Date().toISOString());renderApp();}catch(e){toast(e.message,'err')}}
 function openRing(){state.modal='ring';renderApp();}
 function ringMember(id){state.modal='ring';state.ringRecipient=id;renderApp();}
@@ -1508,15 +1536,15 @@ function updateEditDurationOptions(select){
   return '';
 }
 function modalWrap(title,body){
-  return '<div class="modal-back" onclick="if(event.target===this)closeModal()">' +
-    '<section class="modal">' +
-      '<div class="modal-head">' +
-        '<h3>' + esc(title) + '</h3>' +
-        '<button class="close" type="button" onclick="closeModal()">&#10005;</button>' +
-      '</div>' +
-      body +
-    '</section>' +
-  '</div>';
+  return `<div class="modal-back" onclick="if(event.target===this)closeModal()">
+    <section class="modal">
+      <div class="modal-head">
+        <h3>${esc(title)}</h3>
+        <button class="close" type="button" onclick="closeModal()">&#10005;</button>
+      </div>
+      ${body}
+    </section>
+  </div>`;
 }
 window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await loadData();startPolling();}catch{renderLogin();}}else renderLogin();});
 </script>
