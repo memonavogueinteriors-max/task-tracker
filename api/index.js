@@ -186,7 +186,7 @@ async function sheetPost(url, payload) {
 async function taskSheetRow(db, taskId) {
   const { data: task, error } = await db
     .from('tasks')
-    .select('id,company_id,member_id,assigned_by,title,task_date,hours,status,notes,updated_at')
+    .select('id,company_id,member_id,assigned_by,title,task_date,hours,priority,status,notes,updated_at')
     .eq('id', taskId)
     .single();
   if (error) throw error;
@@ -208,6 +208,7 @@ async function taskSheetRow(db, taskId) {
       role: member?.role || '',
       task: task.title,
       hours: Number(task.hours || 0),
+      priority: task.priority || 'Medium',
       status: task.status,
       notes: task.notes || '',
       assignedBy: assigner?.name || '',
@@ -266,7 +267,7 @@ async function handleBootstrap(res, db, actor) {
       .in('id', memberIds)
       .order('created_at'),
     db.from('tasks')
-      .select('id,company_id,member_id,assigned_by,title,task_date,hours,status,notes,created_at,updated_at')
+      .select('id,company_id,member_id,assigned_by,title,task_date,hours,priority,status,notes,created_at,updated_at')
       .eq('company_id', actor.company_id)
       .in('member_id', memberIds)
       .order('task_date', { ascending: false })
@@ -299,6 +300,7 @@ async function handleBootstrap(res, db, actor) {
       title: task.title,
       taskDate: task.task_date,
       hours: Number(task.hours || 0),
+      priority: task.priority || 'Medium',
       status: task.status,
       notes: task.notes,
       createdAt: task.created_at,
