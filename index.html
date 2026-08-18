@@ -87,7 +87,7 @@
 const state = {
   token: localStorage.getItem('tt_live_token') || '',
   user: null, company: null, members: [], tasks: [], attendance: [], notifications: [],
-  tab: 'work', workDate: localDate(), recordMember: 'all', taskFilterMember: 'all', taskFilterStatus: 'all',
+  tab: 'work', workDate: localDate(), recordMember: 'all', recordDate: localDate(), taskFilterMember: 'all', taskFilterStatus: 'all',
   modal: null, editingTask: null, editingMember: null, notificationsOpen: false, busy: false
 };
 let pollTimer = null;
@@ -103,7 +103,31 @@ function dateParts(value) { const d=new Date(value+'T00:00:00'); return {num:Str
 function formatDateTime(value) { if(!value) return ''; return new Date(value).toLocaleString(); }
 function memberById(id) { return state.members.find(m=>m.id===id); }
 function attendanceFor(memberId,date) { return state.attendance.find(a=>a.memberId===memberId&&a.workDate===date); }
-function tasksFor(memberId,date) { return state.tasks.filter(t=>t.memberId===memberId&&t.taskDate===date); }
+function tasksFor(memberId,date) {
+  const current = state.tasks.filter(
+    t => t.memberId === memberId && t.taskDate === date
+  );
+
+  const carryForward = state.tasks
+    .filter(t =>
+      t.memberId === memberId &&
+      t.taskDate < date &&
+      t.status !== 'Completed'
+    )
+    .map(t => ({
+      ...t,
+      taskDate: date,
+      carriedForward: true
+    }));
+
+  const currentIds = new Set(current.map(t => t.id));
+
+  return [
+    ...current,
+    ...carryForward.filter(t => !currentIds.has(t.id))
+  ];
+}
+
 function formatTaskDuration(hours) {
   const value = Number(hours || 0);
 
@@ -293,13 +317,23 @@ async function loadData(show=true){
     setUnlockedWorkDate();
 
     setBrand();
-    renderApp();
+
+    // Never destroy an open Edit Task / other modal during polling.
+    if(!state.modal){
+      renderApp();
+    }
   }catch(e){
     if(show)toast(e.message,'err');
   }
 }
-function startPolling(){clearInterval(pollTimer);pollTimer=setInterval(()=>{if(state.token&&!state.busy)loadData(false)},15000);}
-
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(()=>{
+    if(state.token && !state.busy && !state.modal){
+      loadData(false);
+    }
+  },15000);
+}
 function canSelectWorkDate(date) {
   if (!date) return false;
   if (date < TRACKER_START_DATE) return false;
@@ -398,7 +432,7 @@ function renderWork(){
   onclick="saveAttendance('login')"
   ${attendance?.finishedAt?'disabled':''}
 >
-  ${attendance?.loginTime ? '? Saved Login' : 'Save Login'}
+  ${attendance?.loginTime ? '&#10003; Saved Login' : 'Save Login'}
 </button>
 
 <div class="field">
@@ -418,7 +452,7 @@ function renderWork(){
   onclick="saveAttendance('logout')"
   ${attendance?.finishedAt?'disabled':''}
 >
-  ${attendance?.logoutTime ? '? Saved Logout' : 'Save Logout'}
+  ${attendance?.logoutTime ? '&#10003; Saved Logout' : 'Save Logout'}
 </button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>&#9989; Finish Day</button></div>
       ${attendance?.finishedAt?`<div class="success">Finished on ${esc(formatDateTime(attendance.finishedAt))}. This day is stored permanently and synced to Google Sheets.</div>`:''}
     </section>
@@ -813,7 +847,7 @@ function renderAddTaskCard() {
       <div class="card-head huddle-header">
 
         <div>
-          <h3>? Add Your Tasks</h3>
+          <h3>Add Your Tasks</h3>
         </div>
 
       </div>
@@ -1014,11 +1048,191 @@ function renderTasks(){
 }
 
 function renderRecords(){
-  const records=[...state.attendance].filter(a=>state.recordMember==='all'||a.memberId===state.recordMember).sort((a,b)=>b.workDate.localeCompare(a.workDate));
-  return `<div class="page-head"><div><h2>Daily Records</h2><p>Finished and active work days with attendance and task hours.</p></div></div>
-    ${canManageTeam()?`<section class="card"><div class="field" style="max-width:300px;margin:0"><label>Filter Member</label><select onchange="state.recordMember=this.value;renderApp()"><option value="all">All Members</option>${state.members.map(m=>`<option value="${m.id}" ${state.recordMember===m.id?'selected':''}>${esc(m.name)} â€” ${esc(m.employeeId)}</option>`).join('')}</select></div></section>`:''}
-    ${records.length?records.map(a=>renderOneDayBlock(a.memberId,a.workDate)).join(''):`<div class="card empty"><div class="emoji">ðŸ“…</div>No attendance or finished-day records yet.</div>`}`;
+  const selectedMember = state.recordMember || 'all';
+  const selectedDate = state.recordDate || localDate();
+
+  const records = [...state.attendance]
+    .filter(a => selectedMember === 'all' || a.memberId === selectedMember)
+    .filter(a => !selectedDate || a.workDate === selectedDate)
+    .sort((a,b) => b.workDate.localeCompare(a.workDate));
+
+  return `
+    <div class="page-head">
+      <div>
+        <h2>Daily Records</h2>
+        <p>Search a team member and date, then generate the daily PDF.</p>
+      </div>
+    </div>
+
+    ${
+      canManageTeam()
+        ? `
+          <section class="card no-print">
+            <div class="card-head">
+              <div>
+                <h3>Daily PDF Report</h3>
+                <p>Select one team member and one date.</p>
+              </div>
+            </div>
+
+            <div class="attendance">
+              <div class="field">
+                <label>Team Member</label>
+                <select onchange="state.recordMember=this.value;renderApp()">
+                  <option value="all">All Members</option>
+                  ${state.members.map(m => `
+                    <option value="${m.id}" ${selectedMember === m.id ? 'selected' : ''}>
+                      ${esc(m.name)} — ${esc(m.employeeId)}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value="${esc(selectedDate)}"
+                  onchange="state.recordDate=this.value;renderApp()"
+                >
+              </div>
+
+              ${
+                isOwner()
+                  ? `
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      onclick="generateDailyPDF()"
+                      ${selectedMember === 'all' ? 'disabled' : ''}
+                    >
+                      Generate PDF
+                    </button>
+                  `
+                  : ''
+              }
+            </div>
+          </section>
+        `
+        : ''
+    }
+
+    ${
+      records.length
+        ? records.map(a => renderOneDayBlock(a.memberId,a.workDate)).join('')
+        : `
+          <div class="card empty">
+            <div class="emoji">??</div>
+            No records found for the selected employee/date.
+          </div>
+        `
+    }
+  `;
 }
+
+function generateDailyPDF(){
+  const memberId = state.recordMember;
+  const date = state.recordDate || localDate();
+
+  if (!memberId || memberId === 'all') {
+    return toast('Select one team member first.','err');
+  }
+
+  const member = memberById(memberId);
+  if (!member) {
+    return toast('Team member not found.','err');
+  }
+
+  const attendance = attendanceFor(memberId,date) || {};
+  const tasks = tasksFor(memberId,date);
+
+  const totalHours = tasks.reduce(
+    (sum,t) => sum + Number(t.hours || 0),
+    0
+  );
+
+  const rows = tasks.map((t,i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${esc(t.title)}</td>
+      <td>${esc(t.priority || '—')}</td>
+      <td>${formatTaskDuration(t.hours)}</td>
+      <td>${esc(t.status)}</td>
+      <td>${esc(t.notes || '—')}</td>
+    </tr>
+  `).join('');
+
+  const w = window.open('', '_blank', 'width=1100,height=800');
+
+  if (!w) {
+    return toast('Allow pop-ups to generate the PDF.','err');
+  }
+
+  w.document.write(`
+    <!doctype html>
+    <html>
+    <head>
+      <title>Daily Task Report - ${esc(member.name)} - ${esc(date)}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:30px;color:#111}
+        h1{margin:0 0 8px}
+        .meta{line-height:1.7;margin-bottom:20px}
+        .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+        .box{border:1px solid #ccc;padding:12px}
+        .box strong{display:block;font-size:18px;margin-top:5px}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #ccc;padding:8px;font-size:12px;text-align:left;vertical-align:top}
+        th{font-weight:800}
+        footer{margin-top:24px;font-size:11px;color:#666}
+      </style>
+    </head>
+    <body>
+      <h1>Daily Task Report</h1>
+
+      <div class="meta">
+        <strong>Employee:</strong> ${esc(member.name)} (${esc(member.employeeId)})<br>
+        <strong>Role:</strong> ${esc(niceRole(member.role))}<br>
+        <strong>Date:</strong> ${esc(formatDate(date))}<br>
+        <strong>Login:</strong> ${esc(attendance.loginTime || '—')}
+        &nbsp;&nbsp;
+        <strong>Logout:</strong> ${esc(attendance.logoutTime || '—')}
+      </div>
+
+      <div class="summary">
+        <div class="box">Tasks<strong>${tasks.length}</strong></div>
+        <div class="box">Completed<strong>${tasks.filter(t => t.status === 'Completed').length}</strong></div>
+        <div class="box">Task Time<strong>${formatTaskDuration(totalHours)}</strong></div>
+        <div class="box">Day<strong>${attendance.finishedAt ? 'Finished' : 'Active'}</strong></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Task</th>
+            <th>Priority</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || '<tr><td colspan="6">No tasks recorded.</td></tr>'}
+        </tbody>
+      </table>
+
+      <footer>Generated from Vogue Interiors Team Productivity Portal.</footer>
+
+      <script>
+        window.onload=function(){window.print();};
+      </script>
+    </body>
+    </html>
+  `);
+
+  w.document.close();
+}
+
 function renderOneDayBlock(memberId,date){
   const a=attendanceFor(memberId,date)||{};const member=memberById(memberId)||{};const tasks=tasksFor(memberId,date);const p=dateParts(date);const hours=tasks.reduce((s,t)=>s+Number(t.hours||0),0);
   return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} â€” ${esc(member.name||'Member')}</strong><small>${esc(p.month)} Â· ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'â€”')}</strong> Â· Logout: <strong>${esc(a.logoutTime||'â€”')}</strong> Â· Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">âœ“ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks)}</div></article>`;
