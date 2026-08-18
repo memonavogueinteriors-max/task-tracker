@@ -1507,8 +1507,17 @@ function updateEditDurationOptions(select){
   if(state.modal==='ring'){const recipients=state.members.filter(m=>m.id!==state.user.id);return modalWrap('🔔 Ring Notification',`<form onsubmit="sendRing(event)">${isSales()?`<div class="notice">This ring will be sent directly to the Owner.</div>`:`<div class="field"><label>Ring</label><select name="recipientId" required>${recipients.map(m=>`<option value="${m.id}" ${(state.ringRecipient||'')===m.id?'selected':''}>${esc(m.name)} &mdash; ${esc(m.employeeId)}</option>`).join('')}</select></div>`}<div class="field"><label>Message</label><textarea name="message" placeholder="Please check the dashboard…"></textarea></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Send Ring</button></div></form>`)}
   return '';
 }
-function modalWrap(title,body){return `<div class="modal-back" onclick="if(event.target===this)closeModal()"><section class="modal"><div class="modal-head"><h3>${title}</h3><button class="close" onclick="closeModal()">×</button></div>${body}</section></div>`}
-
+function modalWrap(title,body){
+  return '<div class="modal-back" onclick="if(event.target===this)closeModal()">' +
+    '<section class="modal">' +
+      '<div class="modal-head">' +
+        '<h3>' + esc(title) + '</h3>' +
+        '<button class="close" type="button" onclick="closeModal()">&#10005;</button>' +
+      '</div>' +
+      body +
+    '</section>' +
+  '</div>';
+}
 window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await loadData();startPolling();}catch{renderLogin();}}else renderLogin();});
 </script>
 </body>
