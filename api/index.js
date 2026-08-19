@@ -526,6 +526,20 @@ async function handleUpdateTask(req, res, db, actor) {
   if (actor.role === 'sales' && existing.member_id !== actor.id) return send(res, 403, { error: 'You cannot edit this task.' });
 
   const patch = { updated_at: new Date().toISOString() };
+  if (req.body?.memberId !== undefined) {
+    const newMemberId = cleanText(req.body.memberId, 60);
+
+    if (!newMemberId) {
+      return send(res, 400, { error: 'A valid team member is required.' });
+    }
+
+    if (!(await canAssignTo(db, actor, newMemberId))) {
+      return send(res, 403, { error: 'You cannot assign a task to this member.' });
+    }
+
+    patch.member_id = newMemberId;
+  }
+
   if (req.body?.title !== undefined) {
     patch.title = cleanText(req.body.title, 240);
     if (!patch.title) return send(res, 400, { error: 'Task name is required.' });
