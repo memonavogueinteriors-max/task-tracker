@@ -8,6 +8,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.19.1"
   }
 }

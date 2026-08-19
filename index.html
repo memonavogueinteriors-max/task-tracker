@@ -380,7 +380,7 @@ function renderWork(){
   const companyTasksToday=state.tasks.filter(t=>t.taskDate===date); const stats=canManageTeam()?[
     ['Team Members',state.members.length,'Active users visible to you'],['Tasks on Date',companyTasksToday.length,formatDate(date)],['Completed',companyTasksToday.filter(t=>t.status==='Completed').length,'Across visible team'],['Logged Hours',companyTasksToday.reduce((s,t)=>s+Number(t.hours||0),0).toFixed(1),'Across visible team']
   ]:[['My Tasks',mine.length,formatDate(date)],['Completed',completed,'Tasks completed'],['Hours',totalHours.toFixed(1),'Task hours recorded'],['Day',attendance?.finishedAt?'Finished':attendance?.loginTime?'On Duty':'Not Started',attendance?.loginTime?`${attendance.loginTime} &ndash; ${attendance.logoutTime||'...'}`:'Select times below']];
-  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><button class="btn btn-primary" onclick="openRing()">&#128276; Ring</button></div>
+  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><div class="actions"><button class="btn btn-primary" onclick="openVideoCall()">&#128222; Video Call</button><button class="btn btn-primary" onclick="openRing()">&#128276; Ring</button></div></div>
     <section class="grid stats">${stats.map(s=>`<div class="stat"><div class="label">${esc(s[0])}</div><div class="value">${esc(s[1])}</div><div class="meta">${esc(s[2])}</div></div>`).join('')}</section>
     <section class="card"><div class="card-head"><div><h3>&#128338; Attendance</h3><p>You choose the official login and logout times.</p></div><span><span class="status-dot ${attendance?.finishedAt?'done':attendance?.loginTime?'on':''}"></span>${attendance?.finishedAt?'Day Finished':attendance?.loginTime?'On Duty':'Off Duty'}</span></div>
       <div class="attendance"><div class="field"><label>Work Date</label><input
@@ -740,13 +740,14 @@ function renderHuddleSection(priority) {
               <div class="field wide">
 
                 <label>
-                  Description
+                  Notes
+                  <span class="optional">(Optional)</span>
                 </label>
 
                 <input
                   type="text"
                   value="${esc(row.notes)}"
-                  placeholder="Enter description"
+                  placeholder="Optional notes"
                   autocomplete="off"
                   ${saved ? 'disabled' : ''}
                   oninput="
@@ -966,7 +967,7 @@ async function finishDay(){
 
 function renderTaskTable(tasks,own=false){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Description</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'&mdash;')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'&mdash;')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
@@ -1108,195 +1109,111 @@ function renderRecords(){
   `;
 }
 
-function generateDailyPDF(){
-  const memberId=state.recordMember;
+async function generateDailyPDF(){
+  const memberId = state.recordMember;
 
-  if(!memberId||memberId==='all'){
+  if(!memberId || memberId === 'all'){
     toast('Please select a team member first.','err');
     return;
   }
 
-  const date=state.recordDate||localDate();
-  const member=memberById(memberId);
+  const date = state.recordDate || localDate();
 
-  if(!member){
-    toast('Team member not found.','err');
-    return;
+  try {
+    const response = await fetch(
+      `/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
+      {
+        method:'GET',
+        headers:{
+          'Accept':'application/pdf',
+          'Authorization':`Bearer ${state.token}`
+        }
+      }
+    );
+
+    if(!response.ok){
+      let message='Unable to generate PDF.';
+      try{
+        const data=await response.json();
+        message=data.error||message;
+      }catch{}
+      throw new Error(message);
+    }
+
+    const blob=await response.blob();
+
+    if(!blob.size){
+      throw new Error('The PDF file is empty.');
+    }
+
+    const member=memberById(memberId);
+    const safeName=String(member?.name||'Employee')
+      .replace(/[^a-z0-9]+/gi,'-')
+      .replace(/^-+|-+$/g,'');
+
+    const filename=`Daily-Task-Report-${safeName||'Employee'}-${date}.pdf`;
+
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+
+    link.href=url;
+    link.download=filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+
+    toast('PDF downloaded successfully.');
+  }catch(e){
+    toast(e.message||'Unable to generate PDF.','err');
   }
-
-  const attendance=attendanceFor(memberId,date)||{};
-  const tasks=tasksFor(memberId,date);
-
-  const totalHours=tasks.reduce(
-    (sum,t)=>sum+Number(t.hours||0),
-    0
-  );
-
-  const completed=tasks.filter(
-    t=>t.status==='Completed'
-  ).length;
-
-  const rows=tasks.map((t,i)=>`
-    <tr>
-      <td>${i+1}</td>
-      <td>${esc(t.title)}</td>
-      <td>${esc(t.priority||'&mdash;')}</td>
-      <td>${formatTaskDuration(t.hours)}</td>
-      <td>${esc(t.status||'')}</td>
-      <td>${esc(t.notes||'&mdash;')}</td>
-    </tr>
-  `).join('');
-
-  const w=window.open(
-    '',
-    '_blank',
-    'width=1100,height=800'
-  );
-
-  if(!w){
-    toast('Please allow pop-ups to generate the PDF.','err');
-    return;
-  }
-
-  w.document.write(`
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Daily Task Report</title>
-      <style>
-        body{
-          font-family:Arial,sans-serif;
-          padding:35px;
-          color:#172033;
-        }
-        h1{
-          margin:0 0 8px;
-        }
-        .meta{
-          margin:20px 0;
-          line-height:1.8;
-        }
-        .summary{
-          display:flex;
-          gap:12px;
-          margin:20px 0;
-        }
-        .box{
-          border:1px solid #ddd;
-          padding:12px 18px;
-          flex:1;
-        }
-        .box strong{
-          display:block;
-          font-size:20px;
-          margin-top:5px;
-        }
-        table{
-          width:100%;
-          border-collapse:collapse;
-          margin-top:20px;
-        }
-        th,td{
-          border:1px solid #ccc;
-          padding:9px;
-          text-align:left;
-          font-size:12px;
-        }
-        th{
-          font-weight:700;
-        }
-        footer{
-          margin-top:30px;
-          font-size:11px;
-          color:#777;
-        }
-      </style>
-    </head>
-    <body>
-
-      <h1>Daily Task Report</h1>
-
-      <div class="meta">
-        <strong>Employee:</strong>
-        ${esc(member.name)}
-        (${esc(member.employeeId)})<br>
-
-        <strong>Role:</strong>
-        ${esc(member.role)}<br>
-
-        <strong>Date:</strong>
-        ${esc(date)}<br>
-
-        <strong>Login:</strong>
-        ${esc(attendance.loginTime||'&mdash;')}<br>
-
-        <strong>Logout:</strong>
-        ${esc(attendance.logoutTime||'&mdash;')}<br>
-
-        <strong>Day:</strong>
-        ${attendance.finishedAt?'Finished':'Active'}
-      </div>
-
-      <div class="summary">
-        <div class="box">
-          Tasks
-          <strong>${tasks.length}</strong>
-        </div>
-
-        <div class="box">
-          Completed
-          <strong>${completed}</strong>
-        </div>
-
-        <div class="box">
-          Task Time
-          <strong>${formatTaskDuration(totalHours)}</strong>
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Task</th>
-            <th>Priority</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${rows||`
-            <tr>
-              <td colspan="6">No tasks recorded.</td>
-            </tr>
-          `}
-        </tbody>
-      </table>
-
-      <footer>
-        Generated from Vogue Interiors Team Productivity Portal.
-      </footer>
-
-      <script>
-        window.onload=function(){
-          window.print();
-        };
-      <\/script>
-
-    </body>
-    </html>
-  `);
-
-  w.document.close();
 }
 function renderOneDayBlock(memberId,date){
   const a=attendanceFor(memberId,date)||{};const member=memberById(memberId)||{};const tasks=tasksFor(memberId,date);const p=dateParts(date);const hours=tasks.reduce((s,t)=>s+Number(t.hours||0),0);
   return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} — ${esc(member.name||'Member')}</strong><small>${esc(p.month)} · ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'—')}</strong> · Logout: <strong>${esc(a.logoutTime||'—')}</strong> · Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">✓ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks)}</div></article>`;
 }
 
+function renderZoomSettings(c){
+  return `<section class="card">
+    <div class="card-head">
+      <div>
+        <h3>?? Huddle Video Call</h3>
+        <p>Save the recurring company Zoom Huddle meeting once. Authorized employees can then join directly.</p>
+      </div>
+    </div>
+
+    <form onsubmit="saveZoomHuddle(event)">
+      <div class="field">
+        <label>Zoom Join Meeting URL</label>
+        <input
+          name="zoomHuddleUrl"
+          type="url"
+          value="${esc(c.zoom_huddle_url||'')}"
+          placeholder="https://zoom.us/j/123456789"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Save Zoom URL</button>
+        ${c.zoom_huddle_url ? `
+          <a
+            class="btn btn-green"
+            href="${esc(c.zoom_huddle_url)}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Test Video Call</a>
+        ` : ''}
+      </div>
+    </form>
+
+    ${c.zoom_huddle_url
+      ? `<div class="success">? Recurring Huddle Zoom URL is saved. Employees can use Video Call to join it.</div>`
+      : `<div class="notice">Save the recurring Zoom Huddle Join URL here. Employees will not need to enter it each morning.</div>`
+    }
+  </section>`;
+}
 function renderSettings(){
   const c=state.company||{};
   return `<div class="page-head"><div><h2>Owner Settings</h2><p>Shared branding, Google Sheets, and Owner security.</p></div></div>
@@ -1315,6 +1232,24 @@ function renderSettings(){
 function previewLogo(input){const file=input.files?.[0];if(!file)return;if(file.size>650000)return toast('Logo must be smaller than about 650 KB.','err');const reader=new FileReader();reader.onload=()=>{document.getElementById('logoDataUrl').value=reader.result;toast('Logo selected. Click Save Company Settings.');};reader.readAsDataURL(file)}
 function clearLogo(){document.getElementById('logoDataUrl').value='';toast('Logo removed from form. Click Save Company Settings.');}
 async function saveCompany(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{name:f.get('name'),tagline:f.get('tagline'),primaryColor:f.get('primaryColor'),headerColor:f.get('headerColor'),headerColor2:f.get('headerColor2'),logoDataUrl:f.get('logoDataUrl')}});toast('Company branding saved for all devices.');await loadData(false);}catch(e){toast(e.message,'err')}}
+async function saveZoomHuddle(event){
+  event.preventDefault();
+
+  const f=new FormData(event.target);
+  const url=String(f.get('zoomHuddleUrl')||'').trim();
+
+  try{
+    await api('company.update',{
+      method:'PATCH',
+      body:{zoomHuddleUrl:url}
+    });
+
+    toast('Zoom Huddle URL saved.');
+    await loadData(false);
+  }catch(e){
+    toast(e.message,'err');
+  }
+}
 async function saveSheet(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{sheetWebhookUrl:f.get('sheetWebhookUrl')}});toast('Google Sheets URL saved.');await loadData(false);}catch(e){toast(e.message,'err')}}
 async function testSheet(){try{await api('sheet.test',{method:'POST',body:{}});toast('Google Sheet connection is working.');}catch(e){toast(e.message,'err')}}
 async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
@@ -1350,6 +1285,16 @@ function renderNotifications(){
   return html;
 }
 async function markNotificationsRead(){try{await api('notifications.read',{method:'POST',body:{ids:state.notifications.filter(n=>!n.readAt).map(n=>n.id)}});state.notifications.forEach(n=>n.readAt=n.readAt||new Date().toISOString());renderApp();}catch(e){toast(e.message,'err')}}
+function openVideoCall(){
+  const url=String(state.company?.zoom_huddle_url||'').trim();
+
+  if(!url){
+    toast('The Huddle Zoom meeting link has not been saved yet.','err');
+    return;
+  }
+
+  window.open(url,'_blank','noopener,noreferrer');
+}
 function openRing(){state.modal='ring';renderApp();}
 function ringMember(id){state.modal='ring';state.ringRecipient=id;renderApp();}
 async function sendRing(event){event.preventDefault();const f=new FormData(event.target);try{await api('ring',{method:'POST',body:{recipientId:f.get('recipientId'),message:f.get('message')}});state.modal=null;state.ringRecipient=null;toast('Ring sent.');renderApp();}catch(e){toast(e.message,'err')}}
@@ -1457,7 +1402,7 @@ function renderModal(){
       </div>
 
       <div class="field">
-        <label>Description</label>
+        <label>Notes</label>
         <textarea name="notes">${esc(draft.notes)}</textarea>
       </div>
 
@@ -1550,3 +1495,9 @@ window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await l
 </script>
 </body>
 </html>
+
+
+
+
+
+

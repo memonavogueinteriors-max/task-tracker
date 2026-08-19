@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const PDFDocument = require('pdfkit');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -754,11 +755,22 @@ async function handleReadNotifications(req, res, db, actor) {
 async function handleCompanySettings(req, res, db, actor) {
   if (actor.role !== 'owner') return send(res, 403, { error: 'Only the Owner can change company settings.' });
   const patch = { updated_at: new Date().toISOString() };
+
   if (req.body?.name !== undefined) patch.name = cleanText(req.body.name, 120) || 'My Company';
   if (req.body?.tagline !== undefined) patch.tagline = cleanText(req.body.tagline, 180);
   if (req.body?.primaryColor !== undefined) patch.primary_color = cleanText(req.body.primaryColor, 20);
   if (req.body?.headerColor !== undefined) patch.header_color = cleanText(req.body.headerColor, 20);
   if (req.body?.headerColor2 !== undefined) patch.header_color_2 = cleanText(req.body.headerColor2, 20);
+
+  if (req.body?.zoomHuddleUrl !== undefined) {
+    const url = cleanText(req.body.zoomHuddleUrl, 1000);
+
+    if (url && !/^https:\/\/(zoom\.us|[\w.-]+\.zoom\.us)\/.+/i.test(url)) {
+      return send(res, 400, { error: 'Enter a valid Zoom Join Meeting URL.' });
+    }
+
+    patch.zoom_huddle_url = url;
+  }
   if (req.body?.sheetWebhookUrl !== undefined) {
     const url = cleanText(req.body.sheetWebhookUrl, 1000);
     if (url && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)) {
@@ -788,6 +800,270 @@ async function handleTestSheet(res, db, actor) {
   return send(res, 200, { ok: true });
 }
 
+async function handleDailyPDF(req, res, db, actor) {
+  const memberId = cleanText(req.query?.memberId || req.body?.memberId, 100);
+  const date = cleanText(req.query?.date || req.body?.date, 20);
+
+  if (!memberId || !validDate(date)) {
+    return send(res, 400, {
+      error: 'A valid team member and date are required.'
+    });
+  }
+
+  if (!(await canAccessMember(db, actor, memberId))) {
+    return send(res, 403, {
+      error: 'You cannot access this team member report.'
+    });
+  }
+
+  const [
+    { data: member, error: memberError },
+    { data: tasks, error: tasksError },
+    { data: attendance, error: attendanceError }
+  ] = await Promise.all([
+    db
+      .from('members')
+      .select('id,employee_id,name,role')
+      .eq('id', memberId)
+      .eq('company_id', actor.company_id)
+      .single(),
+
+    db
+      .from('tasks')
+      .select('id,title,task_date,hours,priority,status,notes')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('task_date', date)
+      .order('created_at', { ascending: true }),
+
+    db
+      .from('attendance')
+      .select('login_time,logout_time,finished_at')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('work_date', date)
+      .maybeSingle()
+  ]);
+
+  if (memberError) throw memberError;
+  if (tasksError) throw tasksError;
+  if (attendanceError) throw attendanceError;
+
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+
+  const totalHours = safeTasks.reduce(
+    (sum, task) => sum + Number(task.hours || 0),
+    0
+  );
+
+  const completed = safeTasks.filter(
+    task => task.status === 'Completed'
+  ).length;
+
+  const formatDuration = hours => {
+    const totalMinutes = Math.round(Number(hours || 0) * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  };
+
+  const cleanPDFText = value => {
+    return String(value ?? '')
+      .replace(/&mdash;/gi, '—')
+      .replace(/&ndash;/gi, '–')
+      .replace(/&amp;/gi, '&')
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  };
+
+  const priorityLabel = value => {
+    const priority = cleanPDFText(value);
+
+    if (priority === 'High') return 'High';
+    if (priority === 'Medium') return 'Medium';
+    if (priority === 'Low') return 'Low';
+
+    return '';
+  };
+
+  const filenameMember = cleanPDFText(member.name || 'Employee')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const filename = `Daily-Task-Report-${filenameMember || 'Employee'}-${date}.pdf`;
+
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${filename}"`
+  );
+  res.setHeader('Cache-Control', 'no-store');
+
+  const doc = new PDFDocument({
+    size: 'A4',
+    margin: 40,
+    info: {
+      Title: `Daily Task Report - ${cleanPDFText(member.name)}`,
+      Author: 'Vogue Interiors Team Productivity Portal'
+    }
+  });
+
+  doc.pipe(res);
+
+  const pageWidth = doc.page.width - 80;
+
+  doc
+    .fontSize(20)
+    .font('Helvetica-Bold')
+    .text('Daily Task Report');
+
+  doc.moveDown(0.5);
+
+  doc
+    .fontSize(10)
+    .font('Helvetica')
+    .text(`Employee: ${cleanPDFText(member.name)} (${cleanPDFText(member.employee_id)})`)
+    .text(`Role: ${cleanPDFText(member.role)}`)
+    .text(`Date: ${date}`)
+    .text(`Login: ${attendance?.login_time ? String(attendance.login_time).slice(0, 5) : '—'}`)
+    .text(`Logout: ${attendance?.logout_time ? String(attendance.logout_time).slice(0, 5) : '—'}`)
+    .text(`Day: ${attendance?.finished_at ? 'Finished' : 'Active'}`);
+
+  doc.moveDown(1);
+
+  const summaryY = doc.y;
+  const boxWidth = (pageWidth - 20) / 3;
+
+  [
+    ['Tasks', String(safeTasks.length)],
+    ['Completed', String(completed)],
+    ['Task Time', formatDuration(totalHours)]
+  ].forEach((item, index) => {
+    const x = 40 + index * (boxWidth + 10);
+
+    doc
+      .rect(x, summaryY, boxWidth, 48)
+      .stroke();
+
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text(item[0], x + 10, summaryY + 9);
+
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text(item[1], x + 10, summaryY + 24);
+  });
+
+  doc.y = summaryY + 65;
+
+  const columns = [
+    { label: '#', width: 25 },
+    { label: 'Task', width: 185 },
+    { label: 'Priority', width: 65 },
+    { label: 'Duration', width: 60 },
+    { label: 'Status', width: 75 },
+    { label: 'Notes', width: pageWidth - 25 - 185 - 65 - 60 - 75 }
+  ];
+
+  const rowHeight = 32;
+  let tableY = doc.y;
+
+  const drawHeader = () => {
+    let x = 40;
+
+    doc.fontSize(8).font('Helvetica-Bold');
+
+    columns.forEach(column => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+      doc.text(
+        column.label,
+        x + 4,
+        tableY + 10,
+        {
+          width: column.width - 8,
+          align: 'left'
+        }
+      );
+      x += column.width;
+    });
+
+    tableY += rowHeight;
+  };
+
+  const drawRow = task => {
+    if (tableY + rowHeight > doc.page.height - 55) {
+      doc.addPage();
+      tableY = 40;
+      drawHeader();
+    }
+
+    const values = [
+      String(safeTasks.indexOf(task) + 1),
+      cleanPDFText(task.title),
+      priorityLabel(task.priority),
+      formatDuration(task.hours),
+      cleanPDFText(task.status),
+      cleanPDFText(task.notes) || '—'
+    ];
+
+    let x = 40;
+
+    doc.fontSize(7.5).font('Helvetica');
+
+    columns.forEach((column, index) => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+
+      doc.text(
+        values[index],
+        x + 4,
+        tableY + 6,
+        {
+          width: column.width - 8,
+          height: rowHeight - 8,
+          ellipsis: true
+        }
+      );
+
+      x += column.width;
+    });
+
+    tableY += rowHeight;
+  };
+
+  drawHeader();
+
+  if (!safeTasks.length) {
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text('No tasks recorded.', 44, tableY + 10);
+
+    tableY += rowHeight;
+  } else {
+    safeTasks.forEach(drawRow);
+  }
+
+  doc
+    .fontSize(7)
+    .font('Helvetica')
+    .fillColor('#666666')
+    .text(
+      'Generated from Vogue Interiors Team Productivity Portal.',
+      40,
+      doc.page.height - 35,
+      {
+        width: pageWidth
+      }
+    );
+
+  doc.end();
+}
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return send(res, 200, { ok: true });
@@ -802,6 +1078,7 @@ module.exports = async function handler(req, res) {
     if (!actor) return send(res, 401, { error: 'Your login has expired. Please sign in again.' });
 
     if (action === 'bootstrap' && req.method === 'GET') return await handleBootstrap(res, db, actor);
+    if (action === 'daily.pdf' && req.method === 'GET') return await handleDailyPDF(req, res, db, actor);
     if (action === 'member.create' && req.method === 'POST') return await handleCreateMember(req, res, db, actor);
     if (action === 'member.update' && req.method === 'PATCH') return await handleUpdateMember(req, res, db, actor);
     if (action === 'member.selfPin' && req.method === 'PATCH') return await handleSelfPin(req, res, db, actor);
@@ -821,3 +1098,8 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
+
+
+
+
+
