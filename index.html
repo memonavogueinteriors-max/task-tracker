@@ -740,14 +740,13 @@ function renderHuddleSection(priority) {
               <div class="field wide">
 
                 <label>
-                  Notes
-                  <span class="optional">(Optional)</span>
+                  Description
                 </label>
 
                 <input
                   type="text"
                   value="${esc(row.notes)}"
-                  placeholder="Optional notes"
+                  placeholder="Enter description"
                   autocomplete="off"
                   ${saved ? 'disabled' : ''}
                   oninput="
@@ -967,7 +966,7 @@ async function finishDay(){
 
 function renderTaskTable(tasks,own=false){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'&mdash;')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Description</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'&mdash;')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
@@ -1264,7 +1263,7 @@ function generateDailyPDF(){
             <th>Priority</th>
             <th>Duration</th>
             <th>Status</th>
-            <th>Notes</th>
+            <th>Description</th>
           </tr>
         </thead>
 
@@ -1458,7 +1457,7 @@ function renderModal(){
       </div>
 
       <div class="field">
-        <label>Notes</label>
+        <label>Description</label>
         <textarea name="notes">${esc(draft.notes)}</textarea>
       </div>
 
@@ -1551,4 +1550,3 @@ window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await l
 </script>
 </body>
 </html>
-
