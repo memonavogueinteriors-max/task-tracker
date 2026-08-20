@@ -237,6 +237,425 @@ async function syncMemberDay(db, companyId, memberId, date) {
   await Promise.all(tasks.map(task => syncTask(db, task.id)));
 }
 
+async function getChatConversation(db, actor, conversationId) {
+  const id = cleanText(conversationId, 60);
+  if (!id) return null;
+
+  const { data: conversation, error: conversationError } = await db
+    .from('chat_conversations')
+    .select('id, company_id, conversation_type, name, created_at, updated_at')
+    .eq('id', id)
+    .eq('company_id', actor.company_id)
+    .maybeSingle();
+
+  if (conversationError) throw conversationError;
+  if (!conversation) return null;
+
+  const { data: participant, error: participantError } = await db
+    .from('chat_participants')
+    .select('conversation_id, member_id, last_read_at')
+    .eq('conversation_id', id)
+    .eq('member_id', actor.id)
+    .maybeSingle();
+
+  if (participantError) throw participantError;
+  if (!participant) return null;
+
+  return {
+    ...conversation,
+    participant
+  };
+}
+async function handleChatRead(req, res, db, actor) {
+  const conversationId = cleanText(
+    req.body?.conversationId,
+    60
+  );
+
+  const conversation = await getChatConversation(
+    db,
+    actor,
+    conversationId
+  );
+
+  if (!conversation) {
+    return send(res, 403, {
+      error: 'You cannot access this conversation.'
+    });
+  }
+
+  const readAt = new Date().toISOString();
+
+  const { error } = await db
+    .from('chat_participants')
+    .update({
+      last_read_at: readAt
+    })
+    .eq('conversation_id', conversation.id)
+    .eq('member_id', actor.id);
+
+  if (error) throw error;
+
+  return send(res, 200, {
+    ok: true,
+    lastReadAt: readAt
+  });
+}
+async function handleChatSend(req, res, db, actor) {
+  const conversationId = cleanText(req.body?.conversationId, 60);
+  const message = cleanText(req.body?.message, 4000);
+
+  if (!conversationId) {
+    return send(res, 400, {
+      error: 'Conversation is required.'
+    });
+  }
+
+  if (!message) {
+    return send(res, 400, {
+      error: 'Message cannot be empty.'
+    });
+  }
+
+  const conversation = await getChatConversation(
+    db,
+    actor,
+    conversationId
+  );
+
+  if (!conversation) {
+    return send(res, 403, {
+      error: 'You cannot send messages to this conversation.'
+    });
+  }
+
+  const { data, error } = await db
+    .from('chat_messages')
+    .insert({
+      conversation_id: conversation.id,
+      sender_id: actor.id,
+      message
+    })
+    .select(`
+      id,
+      conversation_id,
+      sender_id,
+      message,
+      created_at,
+      sender:members!chat_messages_sender_id_fkey(
+        id,
+        employee_id,
+        name,
+        role
+      )
+    `)
+    .single();
+
+  if (error) throw error;
+
+  const { error: updateError } = await db
+    .from('chat_conversations')
+    .update({
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', conversation.id)
+    .eq('company_id', actor.company_id);
+
+  if (updateError) throw updateError;
+
+  return send(res, 200, {
+    message: data
+  });
+}
+async function handleChatMessages(req, res, db, actor) {
+  const conversationId = cleanText(
+    req.query?.conversationId || req.body?.conversationId,
+    60
+  );
+
+  const conversation = await getChatConversation(
+    db,
+    actor,
+    conversationId
+  );
+
+  if (!conversation) {
+    return send(res, 403, {
+      error: 'You cannot access this conversation.'
+    });
+  }
+
+  const limit = Math.min(
+    Math.max(Number(req.query?.limit || 100), 1),
+    200
+  );
+
+  const { data, error } = await db
+    .from('chat_messages')
+    .select(`
+      id,
+      conversation_id,
+      sender_id,
+      message,
+      created_at,
+      sender:members!chat_messages_sender_id_fkey(
+        id,
+        employee_id,
+        name,
+        role
+      )
+    `)
+    .eq('conversation_id', conversation.id)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return send(res, 200, {
+    messages: data || []
+  });
+}
+async function handleChatOpen(req, res, db, actor) {
+  const type = cleanText(req.body?.type, 20).toLowerCase();
+
+  if (!['private', 'group'].includes(type)) {
+    return send(res, 400, {
+      error: 'Invalid conversation type.'
+    });
+  }
+
+  if (type === 'group') {
+    const { data: existing, error: existingError } = await db
+      .from('chat_conversations')
+      .select('id, company_id, conversation_type, name, created_at, updated_at')
+      .eq('company_id', actor.company_id)
+      .eq('conversation_type', 'group')
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    let conversation = existing;
+
+    if (!conversation) {
+      const { data, error } = await db
+        .from('chat_conversations')
+        .insert({
+          company_id: actor.company_id,
+          conversation_type: 'group',
+          name: 'Team Chat'
+        })
+        .select('id, company_id, conversation_type, name, created_at, updated_at')
+        .single();
+
+      if (error) throw error;
+      conversation = data;
+    }
+
+    const { data: members, error: memberError } = await db
+      .from('members')
+      .select('id')
+      .eq('company_id', actor.company_id)
+      .eq('active', true);
+
+    if (memberError) throw memberError;
+
+    if (members?.length) {
+      const rows = members.map(member => ({
+        conversation_id: conversation.id,
+        member_id: member.id
+      }));
+
+      const { error: participantError } = await db
+        .from('chat_participants')
+        .upsert(rows, {
+          onConflict: 'conversation_id,member_id',
+          ignoreDuplicates: true
+        });
+
+      if (participantError) throw participantError;
+    }
+
+    return send(res, 200, {
+      conversation
+    });
+  }
+
+  const memberId = cleanText(req.body?.memberId, 60);
+
+  if (!memberId || memberId === actor.id) {
+    return send(res, 400, {
+      error: 'Choose another team member.'
+    });
+  }
+
+  if (!(await canAccessMember(db, actor, memberId))) {
+    return send(res, 403, {
+      error: 'You cannot chat with this member.'
+    });
+  }
+
+  const { data: target, error: targetError } = await db
+    .from('members')
+    .select('id, company_id, employee_id, name, role, active')
+    .eq('id', memberId)
+    .eq('company_id', actor.company_id)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (targetError) throw targetError;
+
+  if (!target) {
+    return send(res, 404, {
+      error: 'Team member not found.'
+    });
+  }
+
+  const { data: actorMembership, error: actorMembershipError } = await db
+    .from('chat_participants')
+    .select('conversation_id')
+    .eq('member_id', actor.id);
+
+  if (actorMembershipError) throw actorMembershipError;
+
+  const candidateIds = (actorMembership || []).map(
+    row => row.conversation_id
+  );
+
+  let conversation = null;
+
+  if (candidateIds.length) {
+    const { data: candidates, error: candidateError } = await db
+      .from('chat_conversations')
+      .select('id, company_id, conversation_type, name, created_at, updated_at')
+      .eq('company_id', actor.company_id)
+      .eq('conversation_type', 'private')
+      .in('id', candidateIds);
+
+    if (candidateError) throw candidateError;
+
+    for (const candidate of candidates || []) {
+      const { data: participants, error: participantsError } = await db
+        .from('chat_participants')
+        .select('member_id')
+        .eq('conversation_id', candidate.id);
+
+      if (participantsError) throw participantsError;
+
+      const ids = (participants || [])
+        .map(row => row.member_id)
+        .sort();
+
+      const wanted = [actor.id, memberId].sort();
+
+      if (
+        ids.length === 2 &&
+        ids[0] === wanted[0] &&
+        ids[1] === wanted[1]
+      ) {
+        conversation = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!conversation) {
+    const { data, error } = await db
+      .from('chat_conversations')
+      .insert({
+        company_id: actor.company_id,
+        conversation_type: 'private',
+        name: null
+      })
+      .select('id, company_id, conversation_type, name, created_at, updated_at')
+      .single();
+
+    if (error) throw error;
+    conversation = data;
+
+    const { error: participantError } = await db
+      .from('chat_participants')
+      .insert([
+        {
+          conversation_id: conversation.id,
+          member_id: actor.id
+        },
+        {
+          conversation_id: conversation.id,
+          member_id: memberId
+        }
+      ]);
+
+    if (participantError) throw participantError;
+  }
+
+  return send(res, 200, {
+    conversation,
+    member: target
+  });
+}
+async function handleChatConversations(req, res, db, actor) {
+  const { data: memberships, error: membershipError } = await db
+    .from('chat_participants')
+    .select('conversation_id, last_read_at')
+    .eq('member_id', actor.id);
+
+  if (membershipError) throw membershipError;
+
+  const conversationIds = (memberships || []).map(row => row.conversation_id);
+
+  let conversations = [];
+
+  if (conversationIds.length) {
+    const { data, error } = await db
+      .from('chat_conversations')
+      .select('id, company_id, conversation_type, name, created_at, updated_at')
+      .eq('company_id', actor.company_id)
+      .in('id', conversationIds)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+    conversations = data || [];
+  }
+
+  const { data: allowedMembers, error: memberError } = await db
+    .from('members')
+    .select('id, employee_id, name, email, role, active')
+    .eq('company_id', actor.company_id)
+    .eq('active', true);
+
+  if (memberError) throw memberError;
+
+  const unreadByConversation = {};
+
+  for (const conversation of conversations) {
+    const membership = memberships.find(
+      row => row.conversation_id === conversation.id
+    );
+
+    let query = db
+      .from('chat_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conversation.id)
+      .neq('sender_id', actor.id);
+
+    if (membership?.last_read_at) {
+      query = query.gt('created_at', membership.last_read_at);
+    }
+
+    const { count, error } = await query;
+
+    if (error) throw error;
+
+    unreadByConversation[conversation.id] = count || 0;
+  }
+
+  return send(res, 200, {
+    conversations,
+    members: allowedMembers || [],
+    unreadByConversation
+  });
+}
 async function handleLogin(req, res, db) {
   const employeeId = cleanText(req.body?.employeeId, 40).toUpperCase();
   const pin = cleanText(req.body?.pin, 12);
@@ -1078,6 +1497,11 @@ module.exports = async function handler(req, res) {
     if (!actor) return send(res, 401, { error: 'Your login has expired. Please sign in again.' });
 
     if (action === 'bootstrap' && req.method === 'GET') return await handleBootstrap(res, db, actor);
+    if (action === 'chat.conversations' && req.method === 'GET') return await handleChatConversations(req, res, db, actor);
+    if (action === 'chat.open' && req.method === 'POST') return await handleChatOpen(req, res, db, actor);
+    if (action === 'chat.messages' && req.method === 'GET') return await handleChatMessages(req, res, db, actor);
+    if (action === 'chat.send' && req.method === 'POST') return await handleChatSend(req, res, db, actor);
+    if (action === 'chat.read' && req.method === 'POST') return await handleChatRead(req, res, db, actor);
     if (action === 'daily.pdf' && req.method === 'GET') return await handleDailyPDF(req, res, db, actor);
     if (action === 'member.create' && req.method === 'POST') return await handleCreateMember(req, res, db, actor);
     if (action === 'member.update' && req.method === 'PATCH') return await handleUpdateMember(req, res, db, actor);
@@ -1098,6 +1522,17 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
 
 
 
