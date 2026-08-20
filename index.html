@@ -76,6 +76,502 @@
     }
 
     @media(max-width:430px){.stats{grid-template-columns:1fr}.login-card{padding:25px}.content{padding:10px}.page-head{flex-direction:column}.attendance{align-items:stretch}.attendance .field{width:100%}.attendance .btn{width:100%}}
+/* =========================================================
+       CHAT — WhatsApp-style Business Messaging UI
+       ========================================================= */
+
+    .chat-shell{
+      display:grid;
+      grid-template-columns:320px minmax(0,1fr);
+      height:calc(100vh - 150px);
+      min-height:620px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+
+    .chat-sidebar{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+      background:#fff;
+      border-right:1px solid var(--line);
+    }
+
+    .chat-sidebar-head{
+      padding:18px;
+      border-bottom:1px solid var(--line);
+      background:#fff;
+    }
+
+    .chat-sidebar-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:14px;
+    }
+
+    .chat-sidebar-title h3{
+      margin:0;
+      font-size:18px;
+      color:var(--header);
+    }
+
+    .chat-search{
+      position:relative;
+    }
+
+    .chat-search input{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:11px;
+      padding:10px 12px 10px 36px;
+      background:#F7F9FC;
+      color:var(--text);
+      outline:none;
+      font-size:12px;
+    }
+
+    .chat-search input:focus{
+      background:#fff;
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent);
+    }
+
+    .chat-search-icon{
+      position:absolute;
+      left:12px;
+      top:50%;
+      transform:translateY(-50%);
+      color:var(--muted);
+      font-size:14px;
+      pointer-events:none;
+    }
+
+    .chat-sidebar-body{
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      padding:8px 0 14px;
+    }
+
+    .chat-section-label{
+      padding:12px 18px 7px;
+      color:#929BAA;
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.75px;
+    }
+
+    .chat-list{
+      display:flex;
+      flex-direction:column;
+    }
+
+    .chat-row{
+      width:100%;
+      display:flex;
+      align-items:center;
+      gap:11px;
+      border:0;
+      background:transparent;
+      padding:11px 16px;
+      text-align:left;
+      color:var(--text);
+      transition:.15s;
+    }
+
+    .chat-row:hover{
+      background:#F7F9FC;
+    }
+
+    .chat-row.active{
+      background:color-mix(in srgb,var(--primary) 13%,#fff);
+      box-shadow:inset 3px 0 var(--primary);
+    }
+
+    .chat-row-avatar{
+      position:relative;
+      width:44px;
+      height:44px;
+      flex:0 0 44px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:linear-gradient(135deg,var(--header),var(--header2));
+      color:var(--primary);
+      font-size:12px;
+      font-weight:900;
+    }
+
+    .chat-row-avatar.group{
+      background:color-mix(in srgb,var(--primary) 20%,#fff);
+      color:var(--header);
+      font-size:18px;
+    }
+
+    .chat-online-dot{
+      position:absolute;
+      right:0;
+      bottom:1px;
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:#48BB78;
+      border:2px solid #fff;
+    }
+
+    .chat-row-content{
+      min-width:0;
+      flex:1;
+    }
+
+    .chat-row-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .chat-row-name{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:12px;
+      font-weight:850;
+    }
+
+    .chat-row-time{
+      flex:0 0 auto;
+      color:var(--muted);
+      font-size:9px;
+    }
+
+    .chat-row-bottom{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:4px;
+    }
+
+    .chat-row-preview{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:var(--muted);
+      font-size:10px;
+    }
+
+    .chat-row-unread{
+      min-width:18px;
+      height:18px;
+      padding:0 5px;
+      display:grid;
+      place-items:center;
+      border-radius:999px;
+      background:#E53E3E;
+      color:#fff;
+      font-size:9px;
+      font-weight:900;
+    }
+
+    .chat-empty-small{
+      padding:22px 18px;
+      text-align:center;
+      color:var(--muted);
+      font-size:11px;
+    }
+
+    .chat-create-group{
+      margin:0 16px 6px;
+      width:calc(100% - 32px);
+      justify-content:center;
+    }
+
+    .chat-main{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+      min-height:0;
+      background:#F5F7FA;
+    }
+
+    .chat-header{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-height:72px;
+      padding:12px 20px;
+      background:#fff;
+      border-bottom:1px solid var(--line);
+    }
+
+    .chat-header-avatar{
+      width:42px;
+      height:42px;
+      flex:0 0 42px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:linear-gradient(135deg,var(--header),var(--header2));
+      color:var(--primary);
+      font-size:11px;
+      font-weight:900;
+    }
+
+    .chat-header-avatar.group{
+      background:color-mix(in srgb,var(--primary) 20%,#fff);
+      color:var(--header);
+      font-size:17px;
+    }
+
+    .chat-header-info{
+      min-width:0;
+    }
+
+    .chat-header-info strong{
+      display:block;
+      font-size:14px;
+      color:var(--header);
+    }
+
+    .chat-header-info small{
+      display:block;
+      margin-top:3px;
+      color:var(--muted);
+      font-size:10px;
+    }
+
+    .chat-header-actions{
+      margin-left:auto;
+      display:flex;
+      gap:7px;
+    }
+
+    .chat-header-btn{
+      width:34px;
+      height:34px;
+      border:1px solid var(--line);
+      border-radius:9px;
+      background:#fff;
+      color:#596579;
+    }
+
+    .chat-messages{
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      padding:24px 24px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+    }
+
+    .chat-date-divider{
+      align-self:center;
+      margin:4px 0 10px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:#E8EDF3;
+      color:#778295;
+      font-size:9px;
+      font-weight:800;
+    }
+
+    .chat-message{
+      max-width:min(70%,520px);
+      align-self:flex-start;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .chat-message.mine{
+      align-self:flex-end;
+      align-items:flex-end;
+    }
+
+    .chat-message-sender{
+      margin:0 0 4px 5px;
+      color:#697588;
+      font-size:9px;
+      font-weight:800;
+    }
+
+    .chat-message-bubble{
+      padding:9px 12px 7px;
+      border-radius:13px 13px 13px 4px;
+      background:#fff;
+      border:1px solid #E6EAF0;
+      box-shadow:0 2px 7px rgba(15,31,55,.05);
+    }
+
+    .chat-message.mine .chat-message-bubble{
+      border-radius:13px 13px 4px 13px;
+      background:color-mix(in srgb,var(--primary) 24%,#fff);
+      border-color:color-mix(in srgb,var(--primary) 40%,#fff);
+    }
+
+    .chat-message-text{
+      color:var(--text);
+      font-size:12px;
+      line-height:1.55;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+    }
+
+    .chat-message-time{
+      margin-top:4px;
+      text-align:right;
+      color:#8993A2;
+      font-size:8px;
+    }
+
+    .chat-welcome{
+      flex:1;
+      display:grid;
+      place-items:center;
+      padding:30px;
+      text-align:center;
+    }
+
+    .chat-welcome-icon{
+      width:68px;
+      height:68px;
+      margin:0 auto 14px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:color-mix(in srgb,var(--primary) 18%,#fff);
+      color:var(--header);
+      font-size:28px;
+    }
+
+    .chat-welcome h3{
+      margin:0 0 6px;
+      font-size:18px;
+      color:var(--header);
+    }
+
+    .chat-welcome p{
+      max-width:360px;
+      margin:0 auto;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.6;
+    }
+
+    .chat-compose{
+      display:flex;
+      align-items:flex-end;
+      gap:9px;
+      padding:12px 16px;
+      background:#fff;
+      border-top:1px solid var(--line);
+    }
+
+    .chat-compose textarea{
+      flex:1;
+      min-height:42px;
+      max-height:120px;
+      resize:none;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:11px 13px;
+      background:#F7F9FC;
+      color:var(--text);
+      outline:none;
+      font-size:12px;
+    }
+
+    .chat-compose textarea:focus{
+      background:#fff;
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent);
+    }
+
+    .chat-send-btn{
+      min-width:72px;
+      height:42px;
+    }
+
+    .chat-mobile-back{
+      display:none;
+    }
+
+    @media(max-width:900px){
+      .chat-shell{
+        grid-template-columns:280px minmax(0,1fr);
+      }
+
+      .chat-message{
+        max-width:78%;
+      }
+    }
+
+    @media(max-width:760px){
+      .chat-shell{
+        height:calc(100vh - 132px);
+        min-height:560px;
+        grid-template-columns:1fr;
+        border-radius:14px;
+      }
+
+      .chat-shell.mobile-conversation .chat-sidebar{
+        display:none;
+      }
+
+      .chat-shell:not(.mobile-conversation) .chat-main{
+        display:none;
+      }
+
+      .chat-sidebar{
+        border-right:0;
+      }
+
+      .chat-header{
+        min-height:62px;
+        padding:10px 12px;
+      }
+
+      .chat-mobile-back{
+        display:grid;
+        place-items:center;
+        width:34px;
+        height:34px;
+        border:0;
+        border-radius:9px;
+        background:#F3F6FA;
+        color:var(--header);
+      }
+
+      .chat-messages{
+        padding:18px 12px;
+      }
+
+      .chat-message{
+        max-width:86%;
+      }
+
+      .chat-compose{
+        padding:9px;
+      }
+
+      .chat-send-btn{
+        min-width:54px;
+        padding-left:10px;
+        padding-right:10px;
+      }
+    }
+
+
   </style>
 </head>
 <body>
@@ -205,8 +701,23 @@ async function api(action, options={}) {
       headers['Content-Type'] = 'application/json';
     }
 
+    const query = new URLSearchParams();
+
+    if (options.query) {
+      Object.entries(options.query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          query.set(key, String(value));
+        }
+      });
+    }
+
+    const queryString = query.toString();
+    const apiUrl =
+      `http://localhost:3001/api?action=${encodeURIComponent(action)}` +
+      (queryString ? `&${queryString}` : '');
+
     return fetch(
-      `/api?action=${encodeURIComponent(action)}`,
+      apiUrl,
       {
         method,
         headers,
@@ -475,7 +986,10 @@ async function openTeamChat(){
 
     const result = await chatOpenGroup();
 
-    state.chatCurrent = result.conversation;
+    state.chatCurrent = {
+      ...result.conversation,
+      displayName: result.member?.name || result.conversation?.displayName || result.conversation?.name || 'Chat'
+    };
     state.chatLoading = false;
 
     await loadChatMessages(result.conversation.id);
@@ -494,7 +1008,10 @@ async function openPrivateChat(memberId){
 
     const result = await chatOpenPrivate(memberId);
 
-    state.chatCurrent = result.conversation;
+    state.chatCurrent = {
+      ...result.conversation,
+      displayName: result.member?.name || result.conversation?.displayName || result.conversation?.name || 'Chat'
+    };
     state.chatLoading = false;
 
     await loadChatMessages(result.conversation.id);
@@ -565,39 +1082,6 @@ async function loadChatMessages(conversationId){
     toast(e.message || 'Unable to load messages.','err');
   }
 }
-async function loadChatConversations(){
-  state.chatLoading = true;
-
-  try {
-    const result = await chatConversations();
-    state.chatConversations = result.conversations || [];
-    state.chatUnread = result.unreadByConversation || {};
-    state.chatLoading = false;
-    renderApp();
-  } catch(e) {
-    state.chatLoading = false;
-    toast(e.message || 'Unable to load conversations.','err');
-  }
-}
-
-async function loadChatMessages(conversationId){
-  try {
-    const result = await chatMessages(conversationId);
-
-    state.chatMessages = result.messages || [];
-
-    await chatRead(conversationId);
-
-    renderApp();
-
-    setTimeout(() => {
-      const box = document.querySelector('.chat-messages');
-      if (box) box.scrollTop = box.scrollHeight;
-    }, 0);
-  } catch(e) {
-    toast(e.message || 'Unable to load messages.','err');
-  }
-}
 async function sendChatMessage(event){
   event.preventDefault();
 
@@ -643,6 +1127,118 @@ async function sendChatMessage(event){
 function renderChat(){
   const current = state.chatCurrent;
   const messages = state.chatMessages || [];
+  const conversations = state.chatConversations || [];
+  const members = (state.members || []).filter(m =>
+    m.id !== state.user?.id && m.active
+  );
+
+  const groups = conversations.filter(c => c.conversation_type === 'group');
+  const privateChats = conversations.filter(c => c.conversation_type !== 'group');
+
+  const currentId = current?.id || '';
+
+  const conversationInitials = (conversation) => {
+    if (conversation?.conversation_type === 'group') return '👥';
+
+    const member = members.find(m =>
+      conversation?.name &&
+      String(conversation.name).toLowerCase().includes(String(m.name || '').toLowerCase())
+    );
+
+    return member ? initials(member.name) : 'CH';
+  };
+
+  const conversationPreview = (conversation) => {
+    const latest = (conversation?.messages || [])[0];
+    if (latest?.message) return latest.message;
+    if (conversation?.conversation_type === 'group') return 'Group conversation';
+    return 'Private conversation';
+  };
+
+  const conversationTime = (conversation) => {
+    const latest = (conversation?.messages || [])[0];
+    return latest?.created_at
+      ? formatDateTime(latest.created_at)
+      : '';
+  };
+
+  const renderConversationRow = (conversation) => {
+    const unread = Number(state.chatUnread?.[conversation.id] || 0);
+    const isGroup = conversation.conversation_type === 'group';
+    const name = conversation.displayName || conversation.name || (isGroup ? 'Group Chat' : 'Private Chat');
+
+    return `
+      <button
+        type="button"
+        class="chat-row ${currentId === conversation.id ? 'active' : ''}"
+        onclick="openExistingChat('${conversation.id}')"
+      >
+        <span class="chat-row-avatar ${isGroup ? 'group' : ''}">
+          ${isGroup ? '👥' : esc(conversationInitials(conversation))}
+          ${!isGroup ? '<span class="chat-online-dot"></span>' : ''}
+        </span>
+
+        <span class="chat-row-content">
+          <span class="chat-row-top">
+            <span class="chat-row-name">${esc(name)}</span>
+            <span class="chat-row-time">${esc(conversationTime(conversation))}</span>
+          </span>
+
+          <span class="chat-row-bottom">
+            <span class="chat-row-preview">${esc(conversationPreview(conversation))}</span>
+            ${unread
+              ? `<span class="chat-row-unread">${unread > 99 ? '99+' : unread}</span>`
+              : ''}
+          </span>
+        </span>
+      </button>
+    `;
+  };
+
+  const renderMemberRow = (member) => {
+    const existing = privateChats.find(c =>
+      String(c.displayName || c.name || '').toLowerCase() ===
+      String(member.name || '').toLowerCase()
+    );
+
+    return `
+      <button
+        type="button"
+        class="chat-row ${existing?.id === currentId ? 'active' : ''}"
+        onclick="openPrivateChat('${member.id}')"
+      >
+        <span class="chat-row-avatar">
+          ${esc(initials(member.name))}
+          <span class="chat-online-dot"></span>
+        </span>
+
+        <span class="chat-row-content">
+          <span class="chat-row-top">
+            <span class="chat-row-name">${esc(member.name)}</span>
+          </span>
+
+          <span class="chat-row-bottom">
+            <span class="chat-row-preview">${esc(member.role || member.employeeId || 'Team member')}</span>
+          </span>
+        </span>
+      </button>
+    `;
+  };
+
+  const currentName = current?.displayName || current?.name || 'Chat';
+  const currentIsGroup = current?.conversation_type === 'group';
+
+  const currentMember = !currentIsGroup
+    ? members.find(m =>
+        String(currentName).toLowerCase().includes(String(m.name || '').toLowerCase())
+      )
+    : null;
+
+  const currentInitials = currentIsGroup
+    ? '👥'
+    : currentMember
+      ? initials(currentMember.name)
+      : initials(currentName);
 
   return `
     <div class="page-head">
@@ -652,153 +1248,222 @@ function renderChat(){
       </div>
     </div>
 
-    <section class="card">
-      <div class="card-head">
-        <div>
-          <h3>Conversations</h3>
-          <p>Select a conversation or start a new one.</p>
-        </div>
+    <section class="chat-shell ${current ? 'mobile-conversation' : ''}">
 
-        <button
-          class="btn btn-primary"
-          type="button"
-          onclick="openTeamChat()"
-        >
-          &#128172; Team Chat
-        </button>
-      </div>
+      <aside class="chat-sidebar">
 
-      <div class="chat-layout">
-        <div class="chat-sidebar">
+        <div class="chat-sidebar-head">
+          <div class="chat-sidebar-title">
+            <h3>Chat</h3>
+            ${isOwner()
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  onclick="openCreateChatGroup()"
+                >
+                  + Group
+                </button>
+              `
+              : ''}
+          </div>
 
-          <div class="chat-section-title">Conversations</div>
-
-          ${(state.chatConversations || []).map(c => `
-            <button
-              type="button"
-              class="chat-member"
-              onclick="openExistingChat('${c.id}')"
+          <div class="chat-search">
+            <span class="chat-search-icon">🔍</span>
+            <input
+              type="search"
+              id="chatSearchInput"
+              placeholder="Search conversations..."
+              oninput="filterChatSidebar(this.value)"
             >
-              <span class="chat-avatar">
-                ${c.conversation_type === 'group'
-                  ? '&#128172;'
-                  : '&#128100;'}
-              </span>
-              <span>
-                <strong>${esc(c.name || 'Private Chat')}</strong>
-                <small>${c.conversation_type === 'group'
-                  ? 'Team Chat'
-                  : 'Private conversation'}</small>
-              </span>
-              ${state.chatUnread?.[c.id]
-                ? `<span class="badge">${state.chatUnread[c.id]}</span>`
-                : ''}
-            </button>
-          `).join('') || `
-            <div class="chat-empty">
-              No conversations yet.
-            </div>
-          `}
-
-          <div class="chat-section-title">Start New Chat</div>
-
-
-          <div class="chat-section-title">Team Members</div>
-
-          ${(state.members || [])
-            .filter(m => m.id !== state.user?.id && m.active)
-            .map(m => `
-              <button
-                type="button"
-                class="chat-member"
-                onclick="openPrivateChat('${m.id}')"
-              >
-                <span class="chat-avatar">${esc(initials(m.name))}</span>
-                <span>
-                  <strong>${esc(m.name)}</strong>
-                  <small>${esc(m.employeeId || '')}</small>
-                </span>
-              </button>
-            `).join('') || `
-              <div class="chat-empty">
-                No other active team members.
-              </div>
-            `}
+          </div>
         </div>
 
-        <div class="chat-main">
+        <div class="chat-sidebar-body">
 
-          ${current ? `
-            <div class="chat-header">
-              <div>
-                <strong>${esc(current.name || 'Private Chat')}</strong>
-                <small>${current.conversation_type === 'group'
-                  ? 'Team Chat'
-                  : 'Private conversation'}</small>
-              </div>
-            </div>
+          <div class="chat-section-label">Groups</div>
 
-            <div class="chat-messages">
-              ${messages.length
-                ? messages.map(m => `
-                    <div class="chat-message ${m.sender_id === state.user?.id ? 'mine' : ''}">
-                      <div class="chat-message-meta">
-                        <strong>${esc(m.sender?.name || 'Unknown')}</strong>
-                        <span>${esc(formatDateTime(m.created_at))}</span>
-                      </div>
-                      <div class="chat-message-body">
-                        ${esc(m.message)}
-                      </div>
-                    </div>
-                  `).join('')
+          <div class="chat-list" id="chatGroupList">
+            ${
+              groups.length
+                ? groups.map(renderConversationRow).join('')
                 : `
-                  <div class="chat-empty">
-                    No messages yet. Start the conversation.
+                  <div class="chat-empty-small">
+                    No groups yet.
                   </div>
-                `}
-            </div>
+                `
+            }
+          </div>
 
-            <form
-              class="chat-compose"
-              onsubmit="sendChatMessage(event)"
-            >
-              <textarea
-                name="message"
-                rows="2"
-                maxlength="4000"
-                placeholder="Write a message..."
-                required
-              ></textarea>
+          <div class="chat-section-label">Private Chats</div>
 
-              <button
-                class="btn btn-primary"
-                type="submit"
-                ${state.chatSending ? 'disabled' : ''}
-              >
-                ${state.chatSending ? 'Sending...' : 'Send'}
-              </button>
-            </form>
-          ` : `
-            <div class="chat-empty chat-welcome">
-              <div class="emoji">&#128172;</div>
-              <h3>Select a conversation</h3>
-              <p>Choose Team Chat or a team member to start chatting.</p>
-            </div>
-          `}
+          <div class="chat-list" id="chatPrivateList">
+            ${
+              members.length
+                ? members.map(renderMemberRow).join('')
+                : `
+                  <div class="chat-empty-small">
+                    No active team members.
+                  </div>
+                `
+            }
+          </div>
 
         </div>
-      </div>
+      </aside>
+
+      <main class="chat-main">
+
+        ${
+          current
+            ? `
+              <div class="chat-header">
+
+                <button
+                  type="button"
+                  class="chat-mobile-back"
+                  onclick="closeMobileChat()"
+                  aria-label="Back to conversations"
+                >
+                  ←
+                </button>
+
+                <div class="chat-header-avatar ${currentIsGroup ? 'group' : ''}">
+                  ${currentIsGroup ? '👥' : esc(currentInitials)}
+                </div>
+
+                <div class="chat-header-info">
+                  <strong>${esc(currentName)}</strong>
+                  <small>
+                    ${
+                      currentIsGroup
+                        ? 'Group conversation'
+                        : esc(currentMember?.role || 'Private conversation')
+                    }
+                  </small>
+                </div>
+
+              </div>
+
+              <div class="chat-messages">
+
+                ${
+                  messages.length
+                    ? messages.map(m => `
+                        <div class="chat-message ${m.sender_id === state.user?.id ? 'mine' : ''}">
+
+                          ${
+                            m.sender_id !== state.user?.id && currentIsGroup
+                              ? `
+                                <div class="chat-message-sender">
+                                  ${esc(m.sender?.name || 'Unknown')}
+                                </div>
+                              `
+                              : ''
+                          }
+
+                          <div class="chat-message-bubble">
+                            <div class="chat-message-text">
+                              ${esc(m.message)}
+                            </div>
+
+                            <div class="chat-message-time">
+                              ${esc(formatDateTime(m.created_at))}
+                            </div>
+                          </div>
+
+                        </div>
+                      `).join('')
+                    : `
+                      <div class="chat-welcome">
+                        <div>
+                          <div class="chat-welcome-icon">💬</div>
+                          <h3>Start the conversation</h3>
+                          <p>
+                            Send a message to ${esc(currentName)}.
+                          </p>
+                        </div>
+                      </div>
+                    `
+                }
+
+              </div>
+
+              <form
+                class="chat-compose"
+                onsubmit="sendChatMessage(event)"
+              >
+                <textarea
+                  name="message"
+                  rows="1"
+                  maxlength="4000"
+                  placeholder="Write a message..."
+                  required
+                  onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();this.form.requestSubmit();}"
+                ></textarea>
+
+                <button
+                  class="btn btn-primary chat-send-btn"
+                  type="submit"
+                  ${state.chatSending ? 'disabled' : ''}
+                >
+                  ${state.chatSending ? '...' : 'Send'}
+                </button>
+              </form>
+            `
+            : `
+              <div class="chat-welcome">
+                <div>
+                  <div class="chat-welcome-icon">💬</div>
+                  <h3>Select a conversation</h3>
+                  <p>
+                    Choose a group or team member from the left to start chatting.
+                  </p>
+                </div>
+              </div>
+            `
+        }
+
+      </main>
+
     </section>
   `;
 }
+
+function filterChatSidebar(query){
+  const q = String(query || '').trim().toLowerCase();
+
+  document.querySelectorAll('.chat-list .chat-row').forEach(row => {
+    row.style.display = !q || row.innerText.toLowerCase().includes(q)
+      ? ''
+      : 'none';
+  });
+}
+
+function closeMobileChat(){
+  state.chatCurrent = null;
+  state.chatMessages = [];
+  stopChatPolling();
+  renderApp();
+}function filterChatSidebar(query){
+  const q = String(query || '').trim().toLowerCase();
+
+  document.querySelectorAll('.chat-list .chat-row').forEach(row => {
+    row.style.display = !q || row.innerText.toLowerCase().includes(q)
+      ? ''
+      : 'none';
+  });
+}
+
+
 function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();if(state.tab==='chat')return renderChat();return renderWork();}
 
 function renderWork(){
   const date=state.workDate;const mine=tasksFor(state.user.id,date);const attendance=attendanceFor(state.user.id,date);const totalHours=mine.reduce((s,t)=>s+Number(t.hours||0),0);const completed=mine.filter(t=>t.status==='Completed').length;
   const companyTasksToday=state.tasks.filter(t=>t.taskDate===date); const stats=canManageTeam()?[
     ['Team Members',state.members.length,'Active users visible to you'],['Tasks on Date',companyTasksToday.length,formatDate(date)],['Completed',companyTasksToday.filter(t=>t.status==='Completed').length,'Across visible team'],['Logged Hours',companyTasksToday.reduce((s,t)=>s+Number(t.hours||0),0).toFixed(1),'Across visible team']
-  ]:[['My Tasks',mine.length,formatDate(date)],['Completed',completed,'Tasks completed'],['Hours',totalHours.toFixed(1),'Task hours recorded'],['Day',attendance?.finishedAt?'Finished':attendance?.loginTime?'On Duty':'Not Started',attendance?.loginTime?`${attendance.loginTime} � ${attendance.logoutTime||'...'}`:'Select times below']];
-  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><div class="actions"><button class="btn btn-primary" onclick="openVideoCall()">&#128222; Video Call</button><button class="btn btn-primary" onclick="openRing()">&#128276; Ring</button></div></div>
+  ]:[['My Tasks',mine.length,formatDate(date)],['Completed',completed,'Tasks completed'],['Hours',totalHours.toFixed(1),'Task hours recorded'],['Day',attendance?.finishedAt?'Finished':attendance?.loginTime?'On Duty':'Not Started',attendance?.loginTime?`${attendance.loginTime} — ${attendance.logoutTime||'...'}`:'Select times below']];
+  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><div class="actions"><button class="btn btn-primary" onclick="openVideoCall()">&#128222; Google Meet</button><button class="btn btn-primary" onclick="openRing()">&#128276; Ring</button></div></div>
     <section class="grid stats">${stats.map(s=>`<div class="stat"><div class="label">${esc(s[0])}</div><div class="value">${esc(s[1])}</div><div class="meta">${esc(s[2])}</div></div>`).join('')}</section>
     <section class="card"><div class="card-head"><div><h3>&#128338; Attendance</h3><p>You choose the official login and logout times.</p></div><span><span class="status-dot ${attendance?.finishedAt?'done':attendance?.loginTime?'on':''}"></span>${attendance?.finishedAt?'Day Finished':attendance?.loginTime?'On Duty':'Off Duty'}</span></div>
       <div class="attendance"><div class="field"><label>Work Date</label><input
@@ -848,7 +1513,27 @@ function renderWork(){
     </section>
     ${renderAddTaskCard()}
     <section class="card"><div class="card-head"><div><h3>Tasks for ${esc(formatDate(date))}</h3><p>${mine.length} task(s), ${totalHours.toFixed(1)} total hour(s)</p></div></div>${renderTaskTable(mine,true)}</section>
-    ${attendance?.finishedAt?renderOneDayBlock(state.user.id,date):''}`;
+    ${(() => {
+  const previousDate = previousRequiredWorkDate(date);
+  if (!previousDate || previousDate === date) return '';
+
+  const previousTasks = tasksFor(state.user.id, previousDate);
+  const previousAttendance = attendanceFor(state.user.id, previousDate);
+
+  if (!previousTasks.length && !previousAttendance) return '';
+
+  return `
+    <div style="margin-top:18px;">
+      <div class="card-head" style="margin-bottom:10px;">
+        <div>
+          <h3>Previous Working Day</h3>
+          <p>Complete previous-day record — tasks can still be edited or updated.</p>
+        </div>
+      </div>
+      ${renderOneDayBlock(state.user.id, previousDate)}
+    </div>
+  `;
+})()}`;
 }
 function isSundayDate(date) {
   const [year, month, day] = String(date).split('-').map(Number);
@@ -1385,7 +2070,7 @@ async function finishDay(){
 
 function renderTaskTable(tasks,own=false){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'�')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
@@ -1489,7 +2174,7 @@ function renderRecords(){
             <option value="all">Select Member</option>
             ${state.members.map(m=>`
               <option value="${m.id}" ${state.recordMember===m.id?'selected':''}>
-                ${esc(m.name)} � ${esc(m.employeeId)}
+                ${esc(m.name)} — ${esc(m.employeeId)}
               </option>
             `).join('')}
           </select>
@@ -1539,7 +2224,7 @@ async function generateDailyPDF(){
 
   try {
     const response = await fetch(
-      `/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
+      `http://localhost:3001/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
       {
         method:'GET',
         headers:{
@@ -1592,47 +2277,46 @@ function renderOneDayBlock(memberId,date){
   return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} — ${esc(member.name||'Member')}</strong><small>${esc(p.month)} · ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'—')}</strong> · Logout: <strong>${esc(a.logoutTime||'—')}</strong> · Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">✓ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks)}</div></article>`;
 }
 
-function renderZoomSettings(c){
+function renderGoogleMeetSettings(c){
   return `<section class="card">
     <div class="card-head">
       <div>
-        <h3>?? Huddle Video Call</h3>
-        <p>Save the recurring company Zoom Huddle meeting once. Authorized employees can then join directly.</p>
+        <h3>📹 Huddle Google Meet</h3>
+        <p>Save the company Google Meet link once. Start the meeting whenever you want — there is no fixed meeting time.</p>
       </div>
     </div>
 
-    <form onsubmit="saveZoomHuddle(event)">
+    <form onsubmit="saveGoogleMeet(event)">
       <div class="field">
-        <label>Zoom Join Meeting URL</label>
+        <label>Google Meet Link</label>
         <input
-          name="zoomHuddleUrl"
+          name="googleMeetUrl"
           type="url"
-          value="${esc(c.zoom_huddle_url||'')}"
-          placeholder="https://zoom.us/j/123456789"
+          value="${esc(c.google_meet_url||'')}"
+          placeholder="https://meet.google.com/xxx-xxxx-xxx"
           autocomplete="off"
         >
       </div>
 
       <div class="actions">
-        <button class="btn btn-primary" type="submit">Save Zoom URL</button>
-        ${c.zoom_huddle_url ? `
+        <button class="btn btn-primary" type="submit">Save Google Meet</button>
+        ${c.google_meet_url ? `
           <a
             class="btn btn-green"
-            href="${esc(c.zoom_huddle_url)}"
+            href="${esc(c.google_meet_url)}"
             target="_blank"
             rel="noopener noreferrer"
-          >Test Video Call</a>
+          >Start Google Meet</a>
         ` : ''}
       </div>
     </form>
 
-    ${c.zoom_huddle_url
-      ? `<div class="success">? Recurring Huddle Zoom URL is saved. Employees can use Video Call to join it.</div>`
-      : `<div class="notice">Save the recurring Zoom Huddle Join URL here. Employees will not need to enter it each morning.</div>`
+    ${c.google_meet_url
+      ? `<div class="success">✓ Google Meet link is saved. Start the Huddle whenever you want. Employees can join using the same link.</div>`
+      : `<div class="notice">Save the recurring Google Meet link once. You will not need to enter a new link every day.</div>`
     }
   </section>`;
-}
-function renderSettings(){
+}function renderSettings(){
   const c=state.company||{};
   return `<div class="page-head"><div><h2>Owner Settings</h2><p>Shared branding, Google Sheets, and Owner security.</p></div></div>
     <section class="grid two-col"><div>
@@ -1650,25 +2334,24 @@ function renderSettings(){
 function previewLogo(input){const file=input.files?.[0];if(!file)return;if(file.size>650000)return toast('Logo must be smaller than about 650 KB.','err');const reader=new FileReader();reader.onload=()=>{document.getElementById('logoDataUrl').value=reader.result;toast('Logo selected. Click Save Company Settings.');};reader.readAsDataURL(file)}
 function clearLogo(){document.getElementById('logoDataUrl').value='';toast('Logo removed from form. Click Save Company Settings.');}
 async function saveCompany(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{name:f.get('name'),tagline:f.get('tagline'),primaryColor:f.get('primaryColor'),headerColor:f.get('headerColor'),headerColor2:f.get('headerColor2'),logoDataUrl:f.get('logoDataUrl')}});toast('Company branding saved for all devices.');await loadData(false);}catch(e){toast(e.message,'err')}}
-async function saveZoomHuddle(event){
+async function saveGoogleMeet(event){
   event.preventDefault();
 
-  const f=new FormData(event.target);
-  const url=String(f.get('zoomHuddleUrl')||'').trim();
+  const f = new FormData(event.target);
+  const url = String(f.get('googleMeetUrl') || '').trim();
 
   try{
     await api('company.update',{
       method:'PATCH',
-      body:{zoomHuddleUrl:url}
+      body:{googleMeetUrl:url}
     });
 
-    toast('Zoom Huddle URL saved.');
+    toast('Google Meet link saved.');
     await loadData(false);
   }catch(e){
     toast(e.message,'err');
   }
-}
-async function saveSheet(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{sheetWebhookUrl:f.get('sheetWebhookUrl')}});toast('Google Sheets URL saved.');await loadData(false);}catch(e){toast(e.message,'err')}}
+}async function saveSheet(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{sheetWebhookUrl:f.get('sheetWebhookUrl')}});toast('Google Sheets URL saved.');await loadData(false);}catch(e){toast(e.message,'err')}}
 async function testSheet(){try{await api('sheet.test',{method:'POST',body:{}});toast('Google Sheet connection is working.');}catch(e){toast(e.message,'err')}}
 async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
 
@@ -1704,16 +2387,15 @@ function renderNotifications(){
 }
 async function markNotificationsRead(){try{await api('notifications.read',{method:'POST',body:{ids:state.notifications.filter(n=>!n.readAt).map(n=>n.id)}});state.notifications.forEach(n=>n.readAt=n.readAt||new Date().toISOString());renderApp();}catch(e){toast(e.message,'err')}}
 function openVideoCall(){
-  const url=String(state.company?.zoom_huddle_url||'').trim();
+  const url = String(state.company?.google_meet_url || '').trim();
 
   if(!url){
-    toast('The Huddle Zoom meeting link has not been saved yet.','err');
+    toast('The Google Meet link has not been saved yet.','err');
     return;
   }
 
   window.open(url,'_blank','noopener,noreferrer');
-}
-function openRing(){state.modal='ring';renderApp();}
+}function openRing(){state.modal='ring';renderApp();}
 function ringMember(id){state.modal='ring';state.ringRecipient=id;renderApp();}
 async function sendRing(event){event.preventDefault();const f=new FormData(event.target);try{await api('ring',{method:'POST',body:{recipientId:f.get('recipientId'),message:f.get('message')}});state.modal=null;state.ringRecipient=null;toast('Ring sent.');renderApp();}catch(e){toast(e.message,'err')}}
 
@@ -1894,7 +2576,7 @@ function updateEditDurationOptions(select){
 }
   if(state.modal==='member'){const managers=state.members.filter(m=>m.role==='manager');return modalWrap('Add Team Member',`<form onsubmit="createMember(event)"><div class="form-grid"><div class="field wide"><label>Full Name</label><input name="name" required></div><div class="field wide"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Role</label><select name="role" onchange="document.getElementById('managerField').style.display=this.value==='sales'?'flex':'none'"><option value="sales">Team Member (Sales)</option><option value="manager">Manager</option></select></div><div class="field"><label>Employee ID</label><input name="employeeId" placeholder="Auto-generated if blank"></div><div class="field"><label>PIN</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}" required></div><div class="field" id="managerField"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Create Member</button></div></form>`)}
   if(state.modal==='memberEdit'){const m=state.editingMember,managers=state.members.filter(x=>x.role==='manager'&&x.id!==m.id);return modalWrap('Manage Member',`<form onsubmit="updateMember(event)"><div class="field"><label>Name</label><input name="name" value="${esc(m.name)}" required></div><div class="field"><label>Email</label><input name="email" type="email" value="${esc(m.email||'')}"></div>${m.role==='sales'?`<div class="field"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(x=>`<option value="${x.id}" ${m.managerId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`:'<input type="hidden" name="managerId" value="">'}<div class="field"><label>New PIN (leave blank to keep current)</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}"></div><label style="display:flex;gap:8px;align-items:center;margin:10px 0 18px"><input name="active" type="checkbox" ${m.active?'checked':''}> Active account</label><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Save Member</button></div></form>`)}
-  if(state.modal==='ring'){const recipients=state.members.filter(m=>m.id!==state.user.id);return modalWrap('🔔 Ring Notification',`<form onsubmit="sendRing(event)">${isSales()?`<div class="notice">This ring will be sent directly to the Owner.</div>`:`<div class="field"><label>Ring</label><select name="recipientId" required>${recipients.map(m=>`<option value="${m.id}" ${(state.ringRecipient||'')===m.id?'selected':''}>${esc(m.name)} � ${esc(m.employeeId)}</option>`).join('')}</select></div>`}<div class="field"><label>Message</label><textarea name="message" placeholder="Please check the dashboard…"></textarea></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Send Ring</button></div></form>`)}
+  if(state.modal==='ring'){const recipients=state.members.filter(m=>m.id!==state.user.id);return modalWrap('🔔 Ring Notification',`<form onsubmit="sendRing(event)">${isSales()?`<div class="notice">This ring will be sent directly to the Owner.</div>`:`<div class="field"><label>Ring</label><select name="recipientId" required>${recipients.map(m=>`<option value="${m.id}" ${(state.ringRecipient||'')===m.id?'selected':''}>${esc(m.name)} — ${esc(m.employeeId)}</option>`).join('')}</select></div>`}<div class="field"><label>Message</label><textarea name="message" placeholder="Please check the dashboard…"></textarea></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Send Ring</button></div></form>`)}
   return '';
 }
 function modalWrap(title,body){

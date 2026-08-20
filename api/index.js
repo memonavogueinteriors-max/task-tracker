@@ -104,22 +104,15 @@ function publicMember(member) {
 }
 
 async function allowedMemberIds(db, actor) {
-  if (actor.role === 'owner') {
-    const { data, error } = await db.from('members').select('id').eq('company_id', actor.company_id).eq('active', true);
-    if (error) throw error;
-    return data.map(row => row.id);
-  }
-  if (actor.role === 'manager') {
-    const { data, error } = await db
-      .from('members')
-      .select('id')
-      .eq('company_id', actor.company_id)
-      .eq('active', true)
-      .or(`id.eq.${actor.id},manager_id.eq.${actor.id}`);
-    if (error) throw error;
-    return data.map(row => row.id);
-  }
-  return [actor.id];
+  const { data, error } = await db
+    .from('members')
+    .select('id')
+    .eq('company_id', actor.company_id)
+    .eq('active', true);
+
+  if (error) throw error;
+
+  return data.map(row => row.id);
 }
 
 async function canAccessMember(db, actor, memberId) {
@@ -259,7 +252,49 @@ async function getChatConversation(db, actor, conversationId) {
     .maybeSingle();
 
   if (participantError) throw participantError;
-  if (!participant) return null;
+
+  if (!participant) {
+    if (conversation.conversation_type !== 'private') {
+      return null;
+    }
+
+    const { data: member, error: memberError } = await db
+      .from('members')
+      .select('id')
+      .eq('id', actor.id)
+      .eq('company_id', actor.company_id)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (memberError) throw memberError;
+    if (!member) return null;
+
+    const { data: repairedParticipant, error: repairError } = await db
+      .from('chat_participants')
+      .upsert(
+        {
+          conversation_id: id,
+          member_id: actor.id
+        },
+        {
+          onConflict: 'conversation_id,member_id',
+          ignoreDuplicates: true
+        }
+      )
+      .select('conversation_id, member_id, last_read_at')
+      .maybeSingle();
+
+    if (repairError) throw repairError;
+
+    return {
+      ...conversation,
+      participant: repairedParticipant || {
+        conversation_id: id,
+        member_id: actor.id,
+        last_read_at: null
+      }
+    };
+  }
 
   return {
     ...conversation,
@@ -489,11 +524,6 @@ async function handleChatOpen(req, res, db, actor) {
     });
   }
 
-  if (!(await canAccessMember(db, actor, memberId))) {
-    return send(res, 403, {
-      error: 'You cannot chat with this member.'
-    });
-  }
 
   const { data: target, error: targetError } = await db
     .from('members')
@@ -572,10 +602,13 @@ async function handleChatOpen(req, res, db, actor) {
 
     if (error) throw error;
     conversation = data;
+  }
 
-    const { error: participantError } = await db
-      .from('chat_participants')
-      .insert([
+  // Always make sure both people belong to the private conversation.
+  const { error: participantError } = await db
+    .from('chat_participants')
+    .upsert(
+      [
         {
           conversation_id: conversation.id,
           member_id: actor.id
@@ -584,10 +617,14 @@ async function handleChatOpen(req, res, db, actor) {
           conversation_id: conversation.id,
           member_id: memberId
         }
-      ]);
+      ],
+      {
+        onConflict: 'conversation_id,member_id',
+        ignoreDuplicates: true
+      }
+    );
 
-    if (participantError) throw participantError;
-  }
+  if (participantError) throw participantError;
 
   return send(res, 200, {
     conversation,
@@ -602,7 +639,9 @@ async function handleChatConversations(req, res, db, actor) {
 
   if (membershipError) throw membershipError;
 
-  const conversationIds = (memberships || []).map(row => row.conversation_id);
+  const conversationIds = (memberships || []).map(
+    row => row.conversation_id
+  );
 
   let conversations = [];
 
@@ -615,6 +654,7 @@ async function handleChatConversations(req, res, db, actor) {
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
+
     conversations = data || [];
   }
 
@@ -626,9 +666,46 @@ async function handleChatConversations(req, res, db, actor) {
 
   if (memberError) throw memberError;
 
-  const unreadByConversation = {};
+  const memberMap = new Map(
+    (allowedMembers || []).map(member => [member.id, member])
+  );
+
+  const enrichedConversations = [];
 
   for (const conversation of conversations) {
+    let displayName = conversation.name || '';
+
+    if (conversation.conversation_type === 'private') {
+      const { data: participants, error: participantError } = await db
+        .from('chat_participants')
+        .select('member_id')
+        .eq('conversation_id', conversation.id);
+
+      if (participantError) throw participantError;
+
+      const otherMemberId = (participants || [])
+        .map(row => row.member_id)
+        .find(id => id !== actor.id);
+
+      const otherMember = otherMemberId
+        ? memberMap.get(otherMemberId)
+        : null;
+
+      displayName =
+        otherMember?.name ||
+        otherMember?.employee_id ||
+        'Private Chat';
+    }
+
+    enrichedConversations.push({
+      ...conversation,
+      displayName
+    });
+  }
+
+  const unreadByConversation = {};
+
+  for (const conversation of enrichedConversations) {
     const membership = memberships.find(
       row => row.conversation_id === conversation.id
     );
@@ -651,7 +728,7 @@ async function handleChatConversations(req, res, db, actor) {
   }
 
   return send(res, 200, {
-    conversations,
+    conversations: enrichedConversations,
     members: allowedMembers || [],
     unreadByConversation
   });
@@ -761,7 +838,7 @@ async function handleCreateMember(req, res, db, actor) {
 
   if (!name) return send(res, 400, { error: 'Member name is required.' });
   if (!['manager', 'sales'].includes(role)) return send(res, 400, { error: 'Role must be Manager or Sales.' });
-  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
+  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
   if (!employeeId) employeeId = await nextEmployeeId(db, actor.company_id, role);
   if (!/^[A-Z0-9-]{3,40}$/.test(employeeId)) return send(res, 400, { error: 'Employee ID can use letters, numbers, and hyphens.' });
 
@@ -818,7 +895,7 @@ async function handleUpdateMember(req, res, db, actor) {
   if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
   if (req.body?.pin) {
     const pin = cleanText(req.body.pin, 12);
-    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
+    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
     patch.pin_hash = await bcrypt.hash(pin, 10);
   }
   patch.updated_at = new Date().toISOString();
@@ -839,7 +916,7 @@ async function handleSelfPin(req, res, db, actor) {
   const currentPin = cleanText(req.body?.currentPin, 12);
   const newPin = cleanText(req.body?.newPin, 12);
   if (!/^\d{4,8}$/.test(currentPin) || !/^\d{4,8}$/.test(newPin)) {
-    return send(res, 400, { error: 'Both PINs must contain 4–8 digits.' });
+    return send(res, 400, { error: 'Both PINs must contain 4â€“8 digits.' });
   }
   const { data: member, error: readError } = await db.from('members').select('pin_hash').eq('id', actor.id).single();
   if (readError || !member || !(await bcrypt.compare(currentPin, member.pin_hash))) {
@@ -1102,9 +1179,18 @@ async function handleAttendance(req, res, db, actor) {
 async function handleFinishDay(req, res, db, actor) {
   const memberId = cleanText(req.body?.memberId, 60) || actor.id;
   const workDate = cleanText(req.body?.workDate, 10);
-  if (!(await canAccessMember(db, actor, memberId))) return send(res, 403, { error: 'You cannot finish this member’s day.' });
-  if (actor.role === 'sales' && memberId !== actor.id) return send(res, 403, { error: 'You can only finish your own day.' });
-  if (!validDate(workDate)) return send(res, 400, { error: 'Choose a valid work date.' });
+
+  if (!(await canAccessMember(db, actor, memberId))) {
+    return send(res, 403, { error: 'You cannot finish this memberâ€™s day.' });
+  }
+
+  if (actor.role === 'sales' && memberId !== actor.id) {
+    return send(res, 403, { error: 'You can only finish your own day.' });
+  }
+
+  if (!validDate(workDate)) {
+    return send(res, 400, { error: 'Choose a valid work date.' });
+  }
 
   const { data: current } = await db
     .from('attendance')
@@ -1112,9 +1198,15 @@ async function handleFinishDay(req, res, db, actor) {
     .eq('member_id', memberId)
     .eq('work_date', workDate)
     .maybeSingle();
-  if (!current?.login_time || !current?.logout_time) return send(res, 400, { error: 'Select and save both login and logout times first.' });
+
+  if (!current?.login_time || !current?.logout_time) {
+    return send(res, 400, {
+      error: 'Select and save both login and logout times first.'
+    });
+  }
 
   const finishedAt = new Date().toISOString();
+
   const { data, error } = await db
     .from('attendance')
     .upsert({
@@ -1128,12 +1220,15 @@ async function handleFinishDay(req, res, db, actor) {
     }, { onConflict: 'member_id,work_date' })
     .select('*')
     .single();
+
   if (error) throw error;
 
   await syncMemberDay(db, actor.company_id, memberId, workDate);
-  return send(res, 200, { attendance: data });
-}
 
+  return send(res, 200, {
+    attendance: data
+  });
+}
 async function handleRing(req, res, db, actor) {
   let recipientId = cleanText(req.body?.recipientId, 60);
   const message = cleanText(req.body?.message, 400) || `${actor.name} is ringing you.`;
@@ -1181,14 +1276,14 @@ async function handleCompanySettings(req, res, db, actor) {
   if (req.body?.headerColor !== undefined) patch.header_color = cleanText(req.body.headerColor, 20);
   if (req.body?.headerColor2 !== undefined) patch.header_color_2 = cleanText(req.body.headerColor2, 20);
 
-  if (req.body?.zoomHuddleUrl !== undefined) {
-    const url = cleanText(req.body.zoomHuddleUrl, 1000);
+  if (req.body?.googleMeetUrl !== undefined) {
+    const url = cleanText(req.body.googleMeetUrl, 1000);
 
-    if (url && !/^https:\/\/(zoom\.us|[\w.-]+\.zoom\.us)\/.+/i.test(url)) {
-      return send(res, 400, { error: 'Enter a valid Zoom Join Meeting URL.' });
+    if (url && !/^https:\/\/meet\.google\.com\/.+/i.test(url)) {
+      return send(res, 400, { error: 'Enter a valid Google Meet URL.' });
     }
 
-    patch.zoom_huddle_url = url;
+    patch.google_meet_url = url;
   }
   if (req.body?.sheetWebhookUrl !== undefined) {
     const url = cleanText(req.body.sheetWebhookUrl, 1000);
@@ -1291,8 +1386,8 @@ async function handleDailyPDF(req, res, db, actor) {
 
   const cleanPDFText = value => {
     return String(value ?? '')
-      .replace(/&mdash;/gi, '�')
-      .replace(/&ndash;/gi, '�')
+      .replace(/&mdash;/gi, 'â€”')
+      .replace(/&ndash;/gi, 'â€“')
       .replace(/&amp;/gi, '&')
       .replace(/<[^>]*>/g, '')
       .trim();
@@ -1348,8 +1443,8 @@ async function handleDailyPDF(req, res, db, actor) {
     .text(`Employee: ${cleanPDFText(member.name)} (${cleanPDFText(member.employee_id)})`)
     .text(`Role: ${cleanPDFText(member.role)}`)
     .text(`Date: ${date}`)
-    .text(`Login: ${attendance?.login_time ? String(attendance.login_time).slice(0, 5) : '�'}`)
-    .text(`Logout: ${attendance?.logout_time ? String(attendance.logout_time).slice(0, 5) : '�'}`)
+    .text(`Login: ${attendance?.login_time ? String(attendance.login_time).slice(0, 5) : 'â€”'}`)
+    .text(`Logout: ${attendance?.logout_time ? String(attendance.logout_time).slice(0, 5) : 'â€”'}`)
     .text(`Day: ${attendance?.finished_at ? 'Finished' : 'Active'}`);
 
   doc.moveDown(1);
@@ -1428,7 +1523,7 @@ async function handleDailyPDF(req, res, db, actor) {
       priorityLabel(task.priority),
       formatDuration(task.hours),
       cleanPDFText(task.status),
-      cleanPDFText(task.notes) || '�'
+      cleanPDFText(task.notes) || 'â€”'
     ];
 
     let x = 40;
