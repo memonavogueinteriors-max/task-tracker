@@ -2443,9 +2443,15 @@ function renderTasks(){
 }
 
 function renderRecords(){
-  const records=[...state.attendance]
-    .filter(a=>state.recordMember==='all'||a.memberId===state.recordMember)
-    .sort((a,b)=>b.workDate.localeCompare(a.workDate));
+  let records=[...state.attendance];
+
+  if(!canManageTeam()){
+    records=records.filter(a=>a.memberId===state.user?.id);
+  }else if(state.recordMember!=='all'){
+    records=records.filter(a=>a.memberId===state.recordMember);
+  }
+
+  records.sort((a,b)=>b.workDate.localeCompare(a.workDate));
 
   return `<div class="page-head">
     <div>
