@@ -2937,7 +2937,20 @@ function modalWrap(title,body){
          '</section>' +
          '</div>';
 }
-window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await loadData();startPolling();}catch{renderLogin();}}else renderLogin();});
+window.addEventListener('DOMContentLoaded',async()=>{
+  if(!state.token){
+    renderLogin();
+    return;
+  }
+
+  try{
+    await loadData();
+    startPolling();
+  }catch(e){
+    console.error('Startup load failed:',e);
+    renderLogin();
+  }
+});
 </script>
 </body>
 </html>
