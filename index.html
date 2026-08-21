@@ -2335,9 +2335,38 @@ async function finishDay(){
   try{await api('day.finish',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate}});toast('Day finished and synced to Google Sheets.');renderApp();}catch(e){toast(e.message,'err')}finally{state.busy=false;}
 }
 
-function renderTaskTable(tasks,own=false){
+function renderTaskTable(tasks,showActions=true){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+
+  return `<div class="table-wrap"><table class="table"><thead><tr>
+    <th>Date</th>
+    <th>Member</th>
+    <th>Task</th>
+    <th>Hours</th>
+    <th>Status</th>
+    <th>Assigned By</th>
+    <th>Notes</th>
+    ${showActions?'<th>Actions</th>':''}
+  </tr></thead><tbody>${
+    tasks.map(t=>{
+      const member=memberById(t.memberId);
+      const assigner=memberById(t.assignedBy);
+
+      return `<tr>
+        <td>${esc(t.taskDate)}</td>
+        <td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td>
+        <td>${esc(t.title)}</td>
+        <td>${formatTaskDuration(t.hours)}</td>
+        <td>${statusPill(t.status)}</td>
+        <td>${esc(assigner?.name||'Unknown')}</td>
+        <td>${esc(t.notes||'—')}</td>
+        ${showActions?`<td><div class="actions">
+          <button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button>
+        </div></td>`:''}
+      </tr>`;
+    }).join('')
+  }</tbody></table></div>`;
 }
 async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});state.tasks=state.tasks.filter(t=>t.id!==id);toast('Task deleted.');renderApp();}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
@@ -2542,7 +2571,7 @@ async function generateDailyPDF(){
 }
 function renderOneDayBlock(memberId,date){
   const a=attendanceFor(memberId,date)||{};const member=memberById(memberId)||{};const tasks=tasksFor(memberId,date);const p=dateParts(date);const hours=tasks.reduce((s,t)=>s+Number(t.hours||0),0);
-  return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} — ${esc(member.name||'Member')}</strong><small>${esc(p.month)} · ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'—')}</strong> · Logout: <strong>${esc(a.logoutTime||'—')}</strong> · Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">✓ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks)}</div></article>`;
+  return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} — ${esc(member.name||'Member')}</strong><small>${esc(p.month)} · ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'—')}</strong> · Logout: <strong>${esc(a.logoutTime||'—')}</strong> · Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">✓ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks,false)}</div></article>`;
 }
 
 function renderGoogleMeetSettings(c){
