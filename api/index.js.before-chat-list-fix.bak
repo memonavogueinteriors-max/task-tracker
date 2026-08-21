@@ -416,7 +416,12 @@ async function handleChatMessages(req, res, db, actor) {
 
   if (!conversation) {
     return send(res, 403, {
-      error: 'You cannot access this conversation.'
+      error: 'You cannot access this conversation.',
+      debug: {
+        conversationId,
+        actorId: actor?.id,
+        companyId: actor?.company_id
+      }
     });
   }
 
@@ -460,88 +465,62 @@ async function handleChatOpen(req, res, db, actor) {
   }
 
   if (type === 'group') {
-    const groupName = cleanText(req.body?.name, 80);
-    const requestedMemberIds = Array.isArray(req.body?.memberIds)
-      ? req.body.memberIds
-          .map(id => cleanText(id, 60))
-          .filter(Boolean)
-      : [];
+    const { data: existing, error: existingError } = await db
+      .from('chat_conversations')
+      .select('id, company_id, conversation_type, name, created_at, updated_at')
+      .eq('company_id', actor.company_id)
+      .eq('conversation_type', 'group')
+      .limit(1)
+      .maybeSingle();
 
-    if (!groupName) {
-      return send(res, 400, {
-        error: 'Enter a group name.'
-      });
+    if (existingError) throw existingError;
+
+    let conversation = existing;
+
+    if (!conversation) {
+      const { data, error } = await db
+        .from('chat_conversations')
+        .insert({
+          company_id: actor.company_id,
+          conversation_type: 'group',
+          name: 'Team Chat'
+        })
+        .select('id, company_id, conversation_type, name, created_at, updated_at')
+        .single();
+
+      if (error) throw error;
+      conversation = data;
     }
 
-    const uniqueMemberIds = [
-      ...new Set([
-        actor.id,
-        ...requestedMemberIds
-      ])
-    ];
-
-    const { data: selectedMembers, error: memberError } = await db
+    const { data: members, error: memberError } = await db
       .from('members')
-      .select('id, company_id, active')
+      .select('id')
       .eq('company_id', actor.company_id)
-      .eq('active', true)
-      .in('id', uniqueMemberIds);
+      .eq('active', true);
 
     if (memberError) throw memberError;
 
-    const selectedIds = new Set(
-      (selectedMembers || []).map(member => member.id)
-    );
+    if (members?.length) {
+      const rows = members.map(member => ({
+        conversation_id: conversation.id,
+        member_id: member.id
+      }));
 
-    if (!selectedIds.has(actor.id)) {
-      return send(res, 403, {
-        error: 'You cannot create a group.'
-      });
+      const { error: participantError } = await db
+        .from('chat_participants')
+        .upsert(rows, {
+          onConflict: 'conversation_id,member_id',
+          ignoreDuplicates: true
+        });
+
+      if (participantError) throw participantError;
     }
-
-    const invalidMemberIds = uniqueMemberIds.filter(
-      id => !selectedIds.has(id)
-    );
-
-    if (invalidMemberIds.length) {
-      return send(res, 400, {
-        error: 'One or more selected members are invalid or inactive.'
-      });
-    }
-
-    if (uniqueMemberIds.length < 2) {
-      return send(res, 400, {
-        error: 'Select at least one other team member.'
-      });
-    }
-
-    const { data: conversation, error: conversationError } = await db
-      .from('chat_conversations')
-      .insert({
-        company_id: actor.company_id,
-        conversation_type: 'group',
-        name: groupName
-      })
-      .select('id, company_id, conversation_type, name, created_at, updated_at')
-      .single();
-
-    if (conversationError) throw conversationError;
-
-    const rows = uniqueMemberIds.map(memberId => ({
-      conversation_id: conversation.id,
-      member_id: memberId
-    }));
-
-    const { error: participantError } = await db
-      .from('chat_participants')
-      .insert(rows);
-
-    if (participantError) throw participantError;
 
     return send(res, 200, {
       conversation
     });
   }
+
   const memberId = cleanText(req.body?.memberId, 60);
 
   if (!memberId || memberId === actor.id) {
@@ -665,9 +644,7 @@ async function handleChatConversations(req, res, db, actor) {
 
   if (membershipError) throw membershipError;
 
-  const conversationIds = (memberships || []).map(
-    row => row.conversation_id
-  );
+  const conversationIds = (memberships || []).map(row => row.conversation_id);
 
   let conversations = [];
 
@@ -680,7 +657,6 @@ async function handleChatConversations(req, res, db, actor) {
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
-
     conversations = data || [];
   }
 
@@ -692,46 +668,9 @@ async function handleChatConversations(req, res, db, actor) {
 
   if (memberError) throw memberError;
 
-  const memberMap = new Map(
-    (allowedMembers || []).map(member => [member.id, member])
-  );
-
-  const enrichedConversations = [];
-
-  for (const conversation of conversations) {
-    let displayName = conversation.name || '';
-
-    if (conversation.conversation_type === 'private') {
-      const { data: participants, error: participantError } = await db
-        .from('chat_participants')
-        .select('member_id')
-        .eq('conversation_id', conversation.id);
-
-      if (participantError) throw participantError;
-
-      const otherMemberId = (participants || [])
-        .map(row => row.member_id)
-        .find(id => id !== actor.id);
-
-      const otherMember = otherMemberId
-        ? memberMap.get(otherMemberId)
-        : null;
-
-      displayName =
-        otherMember?.name ||
-        otherMember?.employee_id ||
-        'Private Chat';
-    }
-
-    enrichedConversations.push({
-      ...conversation,
-      displayName
-    });
-  }
-
   const unreadByConversation = {};
 
-  for (const conversation of enrichedConversations) {
+  for (const conversation of conversations) {
     const membership = memberships.find(
       row => row.conversation_id === conversation.id
     );
@@ -743,20 +682,18 @@ async function handleChatConversations(req, res, db, actor) {
       .neq('sender_id', actor.id);
 
     if (membership?.last_read_at) {
-      query = query.gt(
-        'created_at',
-        membership.last_read_at
-      );
+      query = query.gt('created_at', membership.last_read_at);
     }
 
     const { count, error } = await query;
 
     if (error) throw error;
 
-    unreadByConversation[conversation.id] = Number(count || 0);
+    unreadByConversation[conversation.id] = count || 0;
   }
+
   return send(res, 200, {
-    conversations: enrichedConversations,
+    conversations,
     members: allowedMembers || [],
     unreadByConversation
   });
@@ -866,7 +803,7 @@ async function handleCreateMember(req, res, db, actor) {
 
   if (!name) return send(res, 400, { error: 'Member name is required.' });
   if (!['manager', 'sales'].includes(role)) return send(res, 400, { error: 'Role must be Manager or Sales.' });
-  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
+  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
   if (!employeeId) employeeId = await nextEmployeeId(db, actor.company_id, role);
   if (!/^[A-Z0-9-]{3,40}$/.test(employeeId)) return send(res, 400, { error: 'Employee ID can use letters, numbers, and hyphens.' });
 
@@ -923,7 +860,7 @@ async function handleUpdateMember(req, res, db, actor) {
   if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
   if (req.body?.pin) {
     const pin = cleanText(req.body.pin, 12);
-    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
+    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
     patch.pin_hash = await bcrypt.hash(pin, 10);
   }
   patch.updated_at = new Date().toISOString();
@@ -944,7 +881,7 @@ async function handleSelfPin(req, res, db, actor) {
   const currentPin = cleanText(req.body?.currentPin, 12);
   const newPin = cleanText(req.body?.newPin, 12);
   if (!/^\d{4,8}$/.test(currentPin) || !/^\d{4,8}$/.test(newPin)) {
-    return send(res, 400, { error: 'Both PINs must contain 4â€“8 digits.' });
+    return send(res, 400, { error: 'Both PINs must contain 4–8 digits.' });
   }
   const { data: member, error: readError } = await db.from('members').select('pin_hash').eq('id', actor.id).single();
   if (readError || !member || !(await bcrypt.compare(currentPin, member.pin_hash))) {
@@ -1209,7 +1146,7 @@ async function handleFinishDay(req, res, db, actor) {
   const workDate = cleanText(req.body?.workDate, 10);
 
   if (!(await canAccessMember(db, actor, memberId))) {
-    return send(res, 403, { error: 'You cannot finish this memberâ€™s day.' });
+    return send(res, 403, { error: 'You cannot finish this member’s day.' });
   }
 
   if (actor.role === 'sales' && memberId !== actor.id) {
@@ -1352,80 +1289,44 @@ async function handleDailyPDF(req, res, db, actor) {
     });
   }
 
-  let memberIds;
-
-  if (memberId === 'all') {
-    /*
-     * "all" is a report filter, not a real member ID.
-     * Owners and managers can generate the combined team report.
-     */
-    if (actor.role !== 'owner' && actor.role !== 'manager') {
-      return send(res, 403, {
-        error: 'Only the Owner or Manager can generate the all-members report.'
-      });
-    }
-
-    memberIds = await allowedMemberIds(db, actor);
-  } else {
-    if (!(await canAccessMember(db, actor, memberId))) {
-      return send(res, 403, {
-        error: 'You cannot access this team member report.'
-      });
-    }
-
-    memberIds = [memberId];
+  if (!(await canAccessMember(db, actor, memberId))) {
+    return send(res, 403, {
+      error: 'You cannot access this team member report.'
+    });
   }
 
-  const memberResults = await Promise.all(
-    memberIds.map(async currentMemberId => {
-      const [
-        { data: member, error: memberError },
-        { data: tasks, error: tasksError },
-        { data: attendance, error: attendanceError }
-      ] = await Promise.all([
-        db
-          .from('members')
-          .select('id,employee_id,name,role')
-          .eq('id', currentMemberId)
-          .eq('company_id', actor.company_id)
-          .single(),
+  const [
+    { data: member, error: memberError },
+    { data: tasks, error: tasksError },
+    { data: attendance, error: attendanceError }
+  ] = await Promise.all([
+    db
+      .from('members')
+      .select('id,employee_id,name,role')
+      .eq('id', memberId)
+      .eq('company_id', actor.company_id)
+      .single(),
 
-        db
-          .from('tasks')
-          .select('id,title,task_date,hours,priority,status,notes')
-          .eq('company_id', actor.company_id)
-          .eq('member_id', currentMemberId)
-          .eq('task_date', date)
-          .order('created_at', { ascending: true }),
+    db
+      .from('tasks')
+      .select('id,title,task_date,hours,priority,status,notes')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('task_date', date)
+      .order('created_at', { ascending: true }),
 
-        db
-          .from('attendance')
-          .select('login_time,logout_time,finished_at')
-          .eq('company_id', actor.company_id)
-          .eq('member_id', currentMemberId)
-          .eq('work_date', date)
-          .maybeSingle()
-      ]);
+    db
+      .from('attendance')
+      .select('login_time,logout_time,finished_at')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('work_date', date)
+      .maybeSingle()
+  ]);
 
-      if (memberError) throw memberError;
-      if (tasksError) throw tasksError;
-      if (attendanceError) throw attendanceError;
-
-      return {
-        member,
-        tasks: Array.isArray(tasks) ? tasks : [],
-        attendance
-      };
-    })
-  );
-
-  /*
-   * Keep the existing single-member variables working.
-   * For "all", the PDF renderer below will use memberResults.
-   */
-  const member = memberResults[0]?.member || null;
-  const tasks = memberResults[0]?.tasks || [];
-  const attendance = memberResults[0]?.attendance || null;
+  if (memberError) throw memberError;
+  if (tasksError) throw tasksError;
+  if (attendanceError) throw attendanceError;
 
   const safeTasks = Array.isArray(tasks) ? tasks : [];
 
@@ -1450,8 +1351,8 @@ async function handleDailyPDF(req, res, db, actor) {
 
   const cleanPDFText = value => {
     return String(value ?? '')
-      .replace(/&mdash;/gi, 'â€”')
-      .replace(/&ndash;/gi, 'â€“')
+      .replace(/&mdash;/gi, '—')
+      .replace(/&ndash;/gi, '–')
       .replace(/&amp;/gi, '&')
       .replace(/<[^>]*>/g, '')
       .trim();
@@ -1467,15 +1368,11 @@ async function handleDailyPDF(req, res, db, actor) {
     return '';
   };
 
-  const filenameMember =
-    memberId === 'all'
-      ? 'All-Members'
-      : cleanPDFText(member.name || 'Employee')
-          .replace(/[^a-z0-9]+/gi, '-')
-          .replace(/^-+|-+$/g, '');
+  const filenameMember = cleanPDFText(member.name || 'Employee')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
 
-  const filename =
-    `Daily-Task-Report-${filenameMember || 'Employee'}-${date}.pdf`;
+  const filename = `Daily-Task-Report-${filenameMember || 'Employee'}-${date}.pdf`;
 
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/pdf');
@@ -1489,10 +1386,7 @@ async function handleDailyPDF(req, res, db, actor) {
     size: 'A4',
     margin: 40,
     info: {
-      Title:
-        memberId === 'all'
-          ? `Daily Task Report - All Members - ${date}`
-          : `Daily Task Report - ${cleanPDFText(member.name)}`,
+      Title: `Daily Task Report - ${cleanPDFText(member.name)}`,
       Author: 'Vogue Interiors Team Productivity Portal'
     }
   });
@@ -1501,245 +1395,151 @@ async function handleDailyPDF(req, res, db, actor) {
 
   const pageWidth = doc.page.width - 80;
 
-  const renderMemberReport = (report, isFirst) => {
-    if (!isFirst) {
-      doc.addPage();
-    }
+  doc
+    .fontSize(20)
+    .font('Helvetica-Bold')
+    .text('Daily Task Report');
 
-    const reportMember = report.member;
-    const reportTasks = Array.isArray(report.tasks)
-      ? report.tasks
-      : [];
-    const reportAttendance = report.attendance || null;
+  doc.moveDown(0.5);
 
-    const reportTotalHours = reportTasks.reduce(
-      (sum, task) => sum + Number(task.hours || 0),
-      0
-    );
+  doc
+    .fontSize(10)
+    .font('Helvetica')
+    .text(`Employee: ${cleanPDFText(member.name)} (${cleanPDFText(member.employee_id)})`)
+    .text(`Role: ${cleanPDFText(member.role)}`)
+    .text(`Date: ${date}`)
+    .text(`Login: ${attendance?.login_time ? String(attendance.login_time).slice(0, 5) : '—'}`)
+    .text(`Logout: ${attendance?.logout_time ? String(attendance.logout_time).slice(0, 5) : '—'}`)
+    .text(`Day: ${attendance?.finished_at ? 'Finished' : 'Active'}`);
 
-    const reportCompleted = reportTasks.filter(
-      task => task.status === 'Completed'
-    ).length;
+  doc.moveDown(1);
+
+  const summaryY = doc.y;
+  const boxWidth = (pageWidth - 20) / 3;
+
+  [
+    ['Tasks', String(safeTasks.length)],
+    ['Completed', String(completed)],
+    ['Task Time', formatDuration(totalHours)]
+  ].forEach((item, index) => {
+    const x = 40 + index * (boxWidth + 10);
 
     doc
-      .fontSize(20)
+      .rect(x, summaryY, boxWidth, 48)
+      .stroke();
+
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text(item[0], x + 10, summaryY + 9);
+
+    doc
+      .fontSize(14)
       .font('Helvetica-Bold')
-      .fillColor('#000000')
-      .text('Daily Task Report');
+      .text(item[1], x + 10, summaryY + 24);
+  });
 
-    doc.moveDown(0.5);
+  doc.y = summaryY + 65;
 
-    doc
-      .fontSize(10)
-      .font('Helvetica')
-      .text(
-        `Employee: ${cleanPDFText(reportMember?.name || 'Employee')} (${cleanPDFText(reportMember?.employee_id || '')})`
-      )
-      .text(`Role: ${cleanPDFText(reportMember?.role || '')}`)
-      .text(`Date: ${date}`)
-      .text(
-        `Login: ${
-          reportAttendance?.login_time
-            ? String(reportAttendance.login_time).slice(0, 5)
-            : '-'
-        }`
-      )
-      .text(
-        `Logout: ${
-          reportAttendance?.logout_time
-            ? String(reportAttendance.logout_time).slice(0, 5)
-            : '-'
-        }`
-      )
-      .text(
-        `Day: ${
-          reportAttendance?.finished_at
-            ? 'Finished'
-            : 'Active'
-        }`
-      );
+  const columns = [
+    { label: '#', width: 25 },
+    { label: 'Task', width: 185 },
+    { label: 'Priority', width: 65 },
+    { label: 'Duration', width: 60 },
+    { label: 'Status', width: 75 },
+    { label: 'Notes', width: pageWidth - 25 - 185 - 65 - 60 - 75 }
+  ];
 
-    doc.moveDown(1);
+  const rowHeight = 32;
+  let tableY = doc.y;
 
-    const summaryY = doc.y;
-    const boxWidth = (pageWidth - 20) / 3;
+  const drawHeader = () => {
+    let x = 40;
 
-    [
-      ['Tasks', String(reportTasks.length)],
-      ['Completed', String(reportCompleted)],
-      ['Task Time', formatDuration(reportTotalHours)]
-    ].forEach((item, index) => {
-      const x = 40 + index * (boxWidth + 10);
+    doc.fontSize(8).font('Helvetica-Bold');
 
-      doc
-        .rect(x, summaryY, boxWidth, 48)
-        .stroke();
-
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .text(
-          item[0],
-          x + 10,
-          summaryY + 9
-        );
-
-      doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text(
-          item[1],
-          x + 10,
-          summaryY + 24
-        );
-    });
-
-    doc.y = summaryY + 65;
-
-    const columns = [
-      { label: '#', width: 25 },
-      { label: 'Task', width: 185 },
-      { label: 'Priority', width: 65 },
-      { label: 'Duration', width: 60 },
-      { label: 'Status', width: 75 },
-      {
-        label: 'Notes',
-        width:
-          pageWidth -
-          25 -
-          185 -
-          65 -
-          60 -
-          75
-      }
-    ];
-
-    const rowHeight = 32;
-    let tableY = doc.y;
-
-    const drawHeader = () => {
-      let x = 40;
-
-      doc
-        .fontSize(8)
-        .font('Helvetica-Bold');
-
-      columns.forEach(column => {
-        doc
-          .rect(
-            x,
-            tableY,
-            column.width,
-            rowHeight
-          )
-          .stroke();
-
-        doc.text(
-          column.label,
-          x + 4,
-          tableY + 10,
-          {
-            width: column.width - 8,
-            align: 'left'
-          }
-        );
-
-        x += column.width;
-      });
-
-      tableY += rowHeight;
-    };
-
-    const drawRow = (task, taskIndex) => {
-      if (
-        tableY + rowHeight >
-        doc.page.height - 55
-      ) {
-        doc.addPage();
-        tableY = 40;
-        drawHeader();
-      }
-
-      const values = [
-        String(taskIndex + 1),
-        cleanPDFText(task.title),
-        priorityLabel(task.priority),
-        formatDuration(task.hours),
-        cleanPDFText(task.status),
-        cleanPDFText(task.notes) || '-'
-      ];
-
-      let x = 40;
-
-      doc
-        .fontSize(7.5)
-        .font('Helvetica');
-
-      columns.forEach((column, index) => {
-        doc
-          .rect(
-            x,
-            tableY,
-            column.width,
-            rowHeight
-          )
-          .stroke();
-
-        doc.text(
-          values[index],
-          x + 4,
-          tableY + 6,
-          {
-            width: column.width - 8,
-            height: rowHeight - 8,
-            ellipsis: true
-          }
-        );
-
-        x += column.width;
-      });
-
-      tableY += rowHeight;
-    };
-
-    drawHeader();
-
-    if (!reportTasks.length) {
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .text(
-          'No tasks recorded.',
-          44,
-          tableY + 10
-        );
-
-      tableY += rowHeight;
-    } else {
-      reportTasks.forEach(
-        (task, index) =>
-          drawRow(task, index)
-      );
-    }
-
-    doc
-      .fontSize(7)
-      .font('Helvetica')
-      .fillColor('#666666')
-      .text(
-        'Generated from Vogue Interiors Team Productivity Portal.',
-        40,
-        doc.page.height - 35,
+    columns.forEach(column => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+      doc.text(
+        column.label,
+        x + 4,
+        tableY + 10,
         {
-          width: pageWidth
+          width: column.width - 8,
+          align: 'left'
         }
       );
+      x += column.width;
+    });
+
+    tableY += rowHeight;
   };
 
-  memberResults.forEach(
-    (report, index) =>
-      renderMemberReport(report, index === 0)
-  );
+  const drawRow = task => {
+    if (tableY + rowHeight > doc.page.height - 55) {
+      doc.addPage();
+      tableY = 40;
+      drawHeader();
+    }
+
+    const values = [
+      String(safeTasks.indexOf(task) + 1),
+      cleanPDFText(task.title),
+      priorityLabel(task.priority),
+      formatDuration(task.hours),
+      cleanPDFText(task.status),
+      cleanPDFText(task.notes) || '—'
+    ];
+
+    let x = 40;
+
+    doc.fontSize(7.5).font('Helvetica');
+
+    columns.forEach((column, index) => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+
+      doc.text(
+        values[index],
+        x + 4,
+        tableY + 6,
+        {
+          width: column.width - 8,
+          height: rowHeight - 8,
+          ellipsis: true
+        }
+      );
+
+      x += column.width;
+    });
+
+    tableY += rowHeight;
+  };
+
+  drawHeader();
+
+  if (!safeTasks.length) {
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text('No tasks recorded.', 44, tableY + 10);
+
+    tableY += rowHeight;
+  } else {
+    safeTasks.forEach(drawRow);
+  }
+
+  doc
+    .fontSize(7)
+    .font('Helvetica')
+    .fillColor('#666666')
+    .text(
+      'Generated from Vogue Interiors Team Productivity Portal.',
+      40,
+      doc.page.height - 35,
+      {
+        width: pageWidth
+      }
+    );
 
   doc.end();
 }

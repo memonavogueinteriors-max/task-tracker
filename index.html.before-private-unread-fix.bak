@@ -881,29 +881,10 @@ async function loadData(show=true){
     if(show)toast(e.message,'err');
   }
 }
-function hasActiveEditor(){
-  const el = document.activeElement;
-
-  if (!el) return false;
-
-  return (
-    el.tagName === 'INPUT' ||
-    el.tagName === 'TEXTAREA' ||
-    el.tagName === 'SELECT' ||
-    el.isContentEditable
-  );
-}
-
 function startPolling(){
   clearInterval(pollTimer);
-
   pollTimer=setInterval(()=>{
-    if(
-      state.token &&
-      !state.busy &&
-      !state.modal &&
-      !hasActiveEditor()
-    ){
+    if(state.token && !state.busy && !state.modal){
       loadData(false);
     }
   },15000);
@@ -1135,28 +1116,30 @@ function startChatPolling(){
     if (state.tab !== 'chat') return;
 
     try {
+      const result = await chatConversations();
+
       const previousUnread = {
         ...(state.chatUnread || {})
       };
 
-      const result = await chatConversations();
+      state.chatConversations =
+        result.conversations || [];
 
-      const conversations = result.conversations || [];
-      const unreadByConversation =
+      state.chatUnread =
         result.unreadByConversation || {};
 
-      state.chatConversations = conversations;
-      state.chatUnread = unreadByConversation;
-
       /*
-       * Show unread notification for conversations
-       * other than the conversation currently open.
+       * Detect newly received messages in conversations
+       * that are NOT currently open.
        */
-      for (const conversation of conversations) {
+      for (const conversation of state.chatConversations) {
         const id = conversation.id;
 
-        const before = Number(previousUnread[id] || 0);
-        const after = Number(unreadByConversation[id] || 0);
+        const before =
+          Number(previousUnread[id] || 0);
+
+        const after =
+          Number(state.chatUnread[id] || 0);
 
         if (
           after > before &&
@@ -1176,7 +1159,7 @@ function startChatPolling(){
       }
 
       /*
-       * Refresh messages for the currently open conversation.
+       * Refresh messages for the currently open chat.
        */
       if (state.chatCurrent) {
         const messageResult =
@@ -1197,57 +1180,24 @@ function startChatPolling(){
 
         if (changed) {
           state.chatMessages = incoming;
-
-          /*
-           * Never replace the message DOM while the user is typing.
-           * This preserves the textarea, focus, cursor position,
-           * and typed text.
-           */
-          if (!hasActiveEditor()) {
-            const box =
-              document.querySelector('.chat-messages');
-
-            if (box) {
-              const wasNearBottom =
-                box.scrollHeight -
-                box.scrollTop -
-                box.clientHeight < 120;
-
-              const html = state.chatMessages.map(message => {
-                const senderName =
-                  message.sender?.name ||
-                  message.sender?.employee_id ||
-                  'User';
-
-                return `
-                  <div class="chat-message-row ${
-                    message.sender_id === state.user?.id
-                      ? 'mine'
-                      : ''
-                  }">
-                    <div class="chat-message-bubble">
-                      <div class="chat-message-sender">
-                        ${esc(senderName)}
-                      </div>
-                      <div class="chat-message-text">
-                        ${esc(message.message || '')}
-                      </div>
-                      <div class="chat-message-time">
-                        ${esc(formatDateTime(message.created_at))}
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }).join('');
-
-              box.innerHTML = html;
-
-              if (wasNearBottom) {
-                box.scrollTop = box.scrollHeight;
-              }
-            }
-          }
         }
+      }
+
+      /*
+       * Render FIRST so the DOM exists,
+       * then scroll to the latest message.
+       */
+      renderApp();
+
+      if (state.chatCurrent) {
+        requestAnimationFrame(() => {
+          const box =
+            document.querySelector('.chat-messages');
+
+          if (box) {
+            box.scrollTop = box.scrollHeight;
+          }
+        });
       }
 
     } catch(e) {
@@ -1261,15 +1211,9 @@ async function loadChatMessages(conversationId){
 
     state.chatMessages = result.messages || [];
 
-    /*
-     * Render the chat immediately.
-     * Marking it as read must not delay opening the conversation.
-     */
-    renderApp();
+    await chatRead(conversationId);
 
-    chatRead(conversationId).catch(error => {
-      console.warn('Unable to mark chat as read:', error);
-    });
+    renderApp();
 
     /*
      * Wait until the chat DOM has been rendered,
@@ -1848,40 +1792,6 @@ function ensureHuddleRows(priority) {
     huddleRows[priority] = [];
   }
 
-  /*
-   * Only pre-fill carry-forward tasks when this priority
-   * has not already been initialized.
-   */
-  if (huddleRows[priority].length === 0) {
-    const today = huddleToday();
-    const previousDate = previousRequiredWorkDate(today);
-
-    if (previousDate) {
-      const previousTasks = state.tasks
-        .filter(task =>
-          task.memberId === state.user.id &&
-          task.taskDate === previousDate &&
-          task.priority === priority &&
-          task.status !== 'Completed'
-        )
-        .sort((a, b) =>
-          String(a.createdAt || '').localeCompare(
-            String(b.createdAt || '')
-          )
-        )
-        .slice(0, config.max);
-
-      huddleRows[priority] = previousTasks.map(task => ({
-        title: task.title || '',
-        hours: Number(task.hours || huddleDurationOptions(priority)[0].value),
-        status: task.status || 'Pending',
-        notes: task.notes || '',
-        carriedForward: true,
-        sourceTaskId: task.id
-      }));
-    }
-  }
-
   while (huddleRows[priority].length < config.min) {
     huddleRows[priority].push(
       defaultHuddleRow(priority)
@@ -1893,6 +1803,7 @@ function ensureHuddleRows(priority) {
       huddleRows[priority].slice(0, config.max);
   }
 }
+
 function ensureAllHuddleRows() {
   ensureHuddleRows('High');
   ensureHuddleRows('Medium');
@@ -2258,52 +2169,25 @@ async function saveHuddleTasks(priority) {
 
     const taskDate = huddleToday();
 
-    const createdResults = await Promise.all(
-      rows.map(row =>
-        api(
-          'task.create',
-          {
-            method: 'POST',
-            body: {
-              memberId: state.user.id,
-              title: String(row.title).trim(),
-              taskDate,
-              hours: Number(row.hours),
-              priority,
-              status: row.status,
-              notes: String(row.notes || '').trim()
-            }
+    for (const row of rows) {
+
+      await api(
+        'task.create',
+        {
+          method: 'POST',
+          body: {
+            memberId: state.user.id,
+            title: String(row.title).trim(),
+            taskDate,
+            hours: Number(row.hours),
+            priority,
+            status: row.status,
+            notes: String(row.notes || '').trim()
           }
-        )
-      )
-    );
+        }
+      );
 
-    const createdTasks = createdResults
-      .map(result => result.task || result.data || result)
-      .filter(task => task && task.id);
-
-    state.tasks = [
-      ...state.tasks.filter(
-        task =>
-          !createdTasks.some(
-            created => created.id === task.id
-          )
-      ),
-      ...createdTasks.map(task => ({
-        id: task.id,
-        companyId: task.company_id,
-        memberId: task.member_id,
-        assignedBy: task.assigned_by,
-        title: task.title,
-        taskDate: task.task_date,
-        hours: Number(task.hours || 0),
-        status: task.status,
-        notes: task.notes || '',
-        priority: task.priority || 'Medium',
-        createdAt: task.created_at,
-        updatedAt: task.updated_at
-      }))
-    ];
+    }
 
     huddleSaved[priority] = true;
 
@@ -2311,7 +2195,7 @@ async function saveHuddleTasks(priority) {
       `${priority} tasks saved successfully.`
     );
 
-    renderApp();
+    await loadData(false);
 
   } catch (e) {
 
@@ -2328,18 +2212,18 @@ async function saveHuddleTasks(priority) {
 }
 async function saveAttendance(type){
   const input=document.getElementById(type==='login'?'loginTime':'logoutTime'); if(!input?.value)return toast('Select a time first.','err');state.busy=true;
-  try{await api('attendance.save',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate,[type==='login'?'loginTime':'logoutTime']:input.value}});toast(`${type==='login'?'Login':'Logout'} time saved.`);renderApp();}catch(e){toast(e.message,'err')}finally{state.busy=false;}
+  try{await api('attendance.save',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate,[type==='login'?'loginTime':'logoutTime']:input.value}});toast(`${type==='login'?'Login':'Logout'} time saved.`);await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
 }
 async function finishDay(){
   if(!confirm('Finish this day and create the permanent daily block?'))return;state.busy=true;
-  try{await api('day.finish',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate}});toast('Day finished and synced to Google Sheets.');renderApp();}catch(e){toast(e.message,'err')}finally{state.busy=false;}
+  try{await api('day.finish',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate}});toast('Day finished and synced to Google Sheets.');await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
 }
 
 function renderTaskTable(tasks,own=false){
   if(!tasks.length)return `<div class="empty"><div class="emoji">📋</div>No tasks found.</div>`;
   return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
-async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});state.tasks=state.tasks.filter(t=>t.id!==id);toast('Task deleted.');renderApp();}catch(e){toast(e.message,'err')}}
+async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
 function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
 async function updateTask(event){
   event.preventDefault();
@@ -2383,7 +2267,7 @@ async function updateTask(event){
     state.editTaskDraft=null;
 
     toast('Task updated successfully.');
-    renderApp();
+    await loadData(false);
 
   }catch(e){
     state.busy=false;
@@ -2438,8 +2322,7 @@ function renderRecords(){
         <div class="field">
           <label>Team Member</label>
           <select onchange="state.recordMember=this.value;renderApp()">
-            <option value="" ${!state.recordMember?'selected':''}>Select Member</option>
-            <option value="all" ${state.recordMember==='all'?'selected':''}>All Team Members</option>
+            <option value="all">Select Member</option>
             ${state.members.map(m=>`
               <option value="${m.id}" ${state.recordMember===m.id?'selected':''}>
                 ${esc(m.name)} — ${esc(m.employeeId)}
@@ -2483,7 +2366,7 @@ function renderRecords(){
 async function generateDailyPDF(){
   const memberId = state.recordMember;
 
-  if(!memberId){
+  if(!memberId || memberId === 'all'){
     toast('Please select a team member first.','err');
     return;
   }
@@ -2595,7 +2478,7 @@ function renderGoogleMeetSettings(c){
           <div class="field all"><button class="btn btn-primary" type="submit">Save Company Settings</button></div></form></section>
       <section class="card"><div class="card-head"><div><h3>🔐 Change My PIN</h3><p>Use 4–8 digits and keep it private.</p></div></div><form class="form-grid" onsubmit="changeMyPin(event)"><div class="field"><label>Current PIN</label><input name="currentPin" type="password" inputmode="numeric" required></div><div class="field"><label>New PIN</label><input name="newPin" type="password" inputmode="numeric" required></div><div class="field"><label>&nbsp;</label><button class="btn btn-dark" type="submit">Change PIN</button></div></form></section>
     </div><div>
-      <section class="card"><div class="card-head"><div><h3>🟢 Automatic Google Sheets Sync</h3><p>Every task is inserted or updated automatically.</p></div></div><form onsubmit="saveSheet(event)"><div class="field"><label>Apps Script Web App URL</label><input name="sheetWebhookUrl" value="${esc(c.sheet_webhook_url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="actions"><button class="btn btn-primary" type="submit">Save URL</button><button class="btn btn-light" type="button" onclick="testSheet()">Test Connection</button><a class="btn btn-green" href="/google-apps-script/Code.gs" download>Download Code.gs</a></div></form>${c.sheet_webhook_url?`<div class="success">Google Sheets URL is saved. Task, attendance, and Finish Day changes sync from the server.</div>`:`<div class="notice">Create a Google Sheet, deploy the included Apps Script as a Web App, then paste its /exec URL here.</div>`}</section>${renderGoogleMeetSettings(c)}
+      <section class="card"><div class="card-head"><div><h3>🟢 Automatic Google Sheets Sync</h3><p>Every task is inserted or updated automatically.</p></div></div><form onsubmit="saveSheet(event)"><div class="field"><label>Apps Script Web App URL</label><input name="sheetWebhookUrl" value="${esc(c.sheet_webhook_url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="actions"><button class="btn btn-primary" type="submit">Save URL</button><button class="btn btn-light" type="button" onclick="testSheet()">Test Connection</button><a class="btn btn-green" href="/google-apps-script/Code.gs" download>Download Code.gs</a></div></form>${c.sheet_webhook_url?`<div class="success">Google Sheets URL is saved. Task, attendance, and Finish Day changes sync from the server.</div>`:`<div class="notice">Create a Google Sheet, deploy the included Apps Script as a Web App, then paste its /exec URL here.</div>`}</section>
       <section class="card"><div class="card-head"><div><h3>🌍 Multi-Device Status</h3><p>This live version does not use localStorage for business data.</p></div></div><div class="success">✓ Members, tasks, attendance, finished days, notifications, and branding are stored in Supabase and shared across locations.</div><div class="notice">Vercel Environment Variables must remain configured. Never expose the Supabase secret key in this HTML.</div></section>
     </div></section>`;
 }

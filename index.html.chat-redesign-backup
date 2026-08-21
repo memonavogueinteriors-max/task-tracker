@@ -1,0 +1,2592 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0B1730" />
+  <title>Team Task Tracker</title>
+  <style>
+    :root{
+      --primary:#C9A84C;--header:#0B1730;--header2:#1A3560;--bg:#F4F7FB;
+      --card:#fff;--text:#172033;--muted:#748095;--line:#E4EAF1;
+      --green:#2F855A;--red:#C53030;--orange:#C05621;--blue:#2B6CB0;--purple:#6B46C1;
+      --shadow:0 10px 30px rgba(15,31,55,.09);--radius:16px;
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+    .login{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,var(--header),var(--header2));position:relative;overflow:hidden}
+    .login:before,.login:after{content:"";position:absolute;border-radius:50%;filter:blur(4px);opacity:.2;background:var(--primary)}
+    .login:before{width:380px;height:380px;left:-150px;top:-120px}.login:after{width:300px;height:300px;right:-120px;bottom:-100px}
+    .login-card{width:min(430px,100%);background:#fff;border-radius:24px;padding:34px;box-shadow:0 30px 80px rgba(0,0,0,.3);position:relative;z-index:1}
+    .brand{display:flex;align-items:center;gap:12px}.brand-logo,.avatar{display:grid;place-items:center;flex:0 0 auto;font-weight:900}
+    .brand-logo{width:52px;height:52px;border-radius:13px;background:var(--primary);color:var(--header);overflow:hidden}.brand-logo img{width:100%;height:100%;object-fit:contain;background:#fff}
+    .brand h1{font-size:20px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:12px}
+    .login-card h2{font-size:25px;margin:30px 0 6px}.login-card>.sub{margin:0 0 22px;color:var(--muted);font-size:14px}
+    .field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}.field label{font-size:11px;text-transform:uppercase;letter-spacing:.65px;font-weight:800;color:#5F6B7A}
+    .input,.field input,.field select,.field textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;color:var(--text);outline:none}
+    .field input:focus,.field select:focus,.field textarea:focus,.input:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+    .field textarea{min-height:82px;resize:vertical}.btn{border:0;border-radius:10px;padding:10px 15px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.18s}
+    .btn:hover{transform:translateY(-1px)}.btn-primary{background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 70%,#fff));color:var(--header)}
+    .btn-dark{background:linear-gradient(135deg,var(--header),var(--header2));color:#fff}.btn-light{background:#F3F6FA;color:#344055;border:1px solid var(--line)}
+    .btn-danger{background:#FFF5F5;color:var(--red);border:1px solid #FED7D7}.btn-green{background:#F0FFF4;color:var(--green);border:1px solid #9AE6B4}.btn-sm{padding:7px 10px;font-size:12px}.full{width:100%}
+    .error,.success,.notice{padding:10px 12px;border-radius:9px;font-size:13px;margin:10px 0}.error{background:#FFF5F5;border:1px solid #FEB2B2;color:var(--red)}.success{background:#F0FFF4;border:1px solid #9AE6B4;color:var(--green)}.notice{background:#FFFAF0;border:1px solid #FBD38D;color:#744210}
+    .hint{text-align:center;color:var(--muted);font-size:12px;margin:14px 0 0}
+    .app{min-height:100vh}.header{background:linear-gradient(135deg,var(--header),var(--header2));color:#fff;box-shadow:0 5px 24px rgba(11,23,48,.25);position:sticky;top:0;z-index:50}
+    .header-inner{max-width:1500px;margin:auto;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px}.header .brand h1{color:#fff}.header .brand p{color:rgba(255,255,255,.6)}
+    .header-actions{display:flex;align-items:center;gap:9px}.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;position:relative}
+    .badge{position:absolute;right:-5px;top:-5px;background:#E53E3E;color:#fff;border-radius:999px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;font-size:10px;font-weight:900;border:2px solid var(--header)}
+    .user-chip{display:flex;align-items:center;gap:9px;padding:5px 10px 5px 6px;background:rgba(255,255,255,.09);border-radius:999px}.avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:var(--header);font-size:11px}
+    .user-chip strong{font-size:12px;display:block}.user-chip span{font-size:10px;color:rgba(255,255,255,.6);text-transform:capitalize}
+    .layout{max-width:1500px;margin:auto;display:grid;grid-template-columns:225px 1fr;min-height:calc(100vh - 68px)}.sidebar{padding:22px 14px;border-right:1px solid var(--line);background:#fff}
+    .nav-title{font-size:10px;color:#A0A8B5;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:0 10px;margin-bottom:8px}.nav-btn{width:100%;border:0;background:transparent;color:#536074;border-radius:10px;padding:11px 12px;text-align:left;font-weight:750;margin-bottom:4px}
+    .nav-btn:hover{background:#F5F7FA}.nav-btn.active{background:color-mix(in srgb,var(--primary) 17%,#fff);color:var(--header);box-shadow:inset 3px 0 var(--primary)}
+    .content{padding:24px;min-width:0}.page-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}.page-head h2{margin:0 0 4px;font-size:25px}.page-head p{margin:0;color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px}.stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px}.stat,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.stat{padding:18px}.stat .label{font-size:11px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.6px}.stat .value{font-size:28px;font-weight:900;margin-top:7px}.stat .meta{font-size:11px;color:var(--muted);margin-top:4px}
+    .card{padding:19px;margin-bottom:16px}.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}.card-head h3{font-size:16px;margin:0}.card-head p{font-size:12px;color:var(--muted);margin:3px 0 0}
+    .two-col{grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr)}.three-col{grid-template-columns:repeat(3,minmax(0,1fr))}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.form-grid .wide{grid-column:span 2}.form-grid .all{grid-column:1/-1}
+    .attendance{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.attendance .field{margin:0;min-width:150px}.status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#CBD5E0;margin-right:6px}.status-dot.on{background:#48BB78}.status-dot.done{background:var(--primary)}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th{background:#F7F9FC;text-align:left;padding:10px 12px;font-size:10px;color:#778295;text-transform:uppercase;letter-spacing:.55px;white-space:nowrap}.table td{padding:11px 12px;border-top:1px solid #EDF1F5;font-size:12px;vertical-align:middle}.table tr:hover td{background:#FFFDF7}
+    .pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;white-space:nowrap}.p-completed{background:#F0FFF4;color:#276749}.p-progress{background:#EBF8FF;color:#2B6CB0}.p-pending{background:#FFFAF0;color:#C05621}.p-hold{background:#F7FAFC;color:#718096}.p-review{background:#FAF5FF;color:#6B46C1}.p-owner{background:#FFF8DD;color:#744210}.p-manager{background:#EBF8FF;color:#2B6CB0}.p-sales{background:#F0FFF4;color:#276749}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}.empty{text-align:center;padding:42px 20px;color:var(--muted)}.empty .emoji{font-size:38px;margin-bottom:9px}
+    .day-block{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#fff;box-shadow:var(--shadow);margin-bottom:14px}.day-head{background:linear-gradient(135deg,var(--header),var(--header2));color:#fff;padding:14px 17px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.day-title{display:flex;gap:12px;align-items:center}.day-num{font-size:28px;color:var(--primary);font-weight:900}.day-title strong{display:block}.day-title small,.day-meta{color:rgba(255,255,255,.65);font-size:11px}.finished{background:var(--primary);color:var(--header);padding:5px 9px;border-radius:999px;font-size:10px;font-weight:900}.day-body{padding:0}
+    .modal-back{position:fixed;inset:0;background:rgba(7,15,30,.66);z-index:100;display:grid;place-items:center;padding:18px}.modal{background:#fff;border-radius:18px;width:min(560px,100%);max-height:90vh;overflow:auto;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.3)}.modal.large{width:min(780px,100%)}.modal-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px}.modal-head h3{margin:0}.close{border:0;background:#F3F6FA;width:34px;height:34px;border-radius:9px;font-size:18px}
+    .notification-panel{position:fixed;right:18px;top:70px;width:min(390px,calc(100vw - 36px));max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 20px 55px rgba(0,0,0,.2);z-index:90}.np-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.notif{padding:13px 15px;border-bottom:1px solid #EEF2F6;font-size:12px}.notif.unread{background:#FFFDF3;border-left:3px solid var(--primary)}.notif time{display:block;color:var(--muted);font-size:10px;margin-top:5px}
+    .logo-preview{width:90px;height:90px;border-radius:14px;border:1px dashed #C8D0DB;display:grid;place-items:center;overflow:hidden;background:#F8FAFC}.logo-preview img{width:100%;height:100%;object-fit:contain}.color-row{display:flex;gap:10px;align-items:center}.color-row input[type=color]{width:48px;height:40px;padding:3px;border:1px solid var(--line);border-radius:9px;background:#fff}
+    .loading{min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--muted)}.spinner{width:34px;height:34px;border:4px solid #DDE4EC;border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:auto auto 12px}@keyframes spin{to{transform:rotate(360deg)}}
+    .toast{position:fixed;bottom:20px;right:20px;z-index:200;padding:12px 16px;border-radius:11px;color:#fff;font-weight:800;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.22)}.toast.ok{background:#276749}.toast.err{background:#C53030}
+    @media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:760px){.header-inner{padding:10px 12px}.header .brand p,.user-chip div{display:none}.layout{display:block}.sidebar{position:sticky;top:62px;z-index:40;display:flex;overflow:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px;background:#fff}.nav-title{display:none}.nav-btn{width:auto;white-space:nowrap;margin:0 4px;padding:9px 12px}.content{padding:14px}.page-head{align-items:center}.page-head h2{font-size:21px}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:14px}.stat .value{font-size:22px}.form-grid{grid-template-columns:1fr}.form-grid .wide,.form-grid .all{grid-column:auto}.card{padding:14px}.header-actions .btn{display:none}}
+
+    .huddle-card{border-top:4px solid var(--primary)}
+    .huddle-list{display:grid;gap:12px;margin:4px 0 14px}
+    .huddle-row{border:1px solid var(--line);border-radius:14px;padding:15px;background:#FBFCFE}
+    .huddle-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .huddle-row-head strong{font-size:14px}
+    .field-inline{display:flex;align-items:center;gap:8px;margin:0}
+    .field-inline label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;color:#5F6B7A}
+    .field-inline select{border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;background:#fff;color:var(--text)}
+    .optional{font-size:10px;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600}
+    .huddle-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+    @media(max-width:760px){
+      .huddle-row-head{align-items:flex-start;flex-direction:column}
+      .field-inline{width:100%;justify-content:space-between}
+      .field-inline select{flex:1}
+      .huddle-actions{align-items:stretch;flex-direction:column}
+      .huddle-actions .btn{width:100%}
+    }
+
+    @media(max-width:430px){.stats{grid-template-columns:1fr}.login-card{padding:25px}.content{padding:10px}.page-head{flex-direction:column}.attendance{align-items:stretch}.attendance .field{width:100%}.attendance .btn{width:100%}}
+
+    /* =========================================================
+       CHAT — WhatsApp-style Business Messaging UI
+       ========================================================= */
+
+    .chat-shell{
+      display:grid;
+      grid-template-columns:320px minmax(0,1fr);
+      height:calc(100vh - 150px);
+      min-height:620px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+
+    .chat-sidebar{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+      background:#fff;
+      border-right:1px solid var(--line);
+    }
+
+    .chat-sidebar-head{
+      padding:18px;
+      border-bottom:1px solid var(--line);
+      background:#fff;
+    }
+
+    .chat-sidebar-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:14px;
+    }
+
+    .chat-sidebar-title h3{
+      margin:0;
+      font-size:18px;
+      color:var(--header);
+    }
+
+    .chat-search{
+      position:relative;
+    }
+
+    .chat-search input{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:11px;
+      padding:10px 12px 10px 36px;
+      background:#F7F9FC;
+      color:var(--text);
+      outline:none;
+      font-size:12px;
+    }
+
+    .chat-search input:focus{
+      background:#fff;
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent);
+    }
+
+    .chat-search-icon{
+      position:absolute;
+      left:12px;
+      top:50%;
+      transform:translateY(-50%);
+      color:var(--muted);
+      font-size:14px;
+      pointer-events:none;
+    }
+
+    .chat-sidebar-body{
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      padding:8px 0 14px;
+    }
+
+    .chat-section-label{
+      padding:12px 18px 7px;
+      color:#929BAA;
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.75px;
+    }
+
+    .chat-list{
+      display:flex;
+      flex-direction:column;
+    }
+
+    .chat-row{
+      width:100%;
+      display:flex;
+      align-items:center;
+      gap:11px;
+      border:0;
+      background:transparent;
+      padding:11px 16px;
+      text-align:left;
+      color:var(--text);
+      transition:.15s;
+    }
+
+    .chat-row:hover{
+      background:#F7F9FC;
+    }
+
+    .chat-row.active{
+      background:color-mix(in srgb,var(--primary) 13%,#fff);
+      box-shadow:inset 3px 0 var(--primary);
+    }
+
+    .chat-row-avatar{
+      position:relative;
+      width:44px;
+      height:44px;
+      flex:0 0 44px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:linear-gradient(135deg,var(--header),var(--header2));
+      color:var(--primary);
+      font-size:12px;
+      font-weight:900;
+    }
+
+    .chat-row-avatar.group{
+      background:color-mix(in srgb,var(--primary) 20%,#fff);
+      color:var(--header);
+      font-size:18px;
+    }
+
+    .chat-online-dot{
+      position:absolute;
+      right:0;
+      bottom:1px;
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:#48BB78;
+      border:2px solid #fff;
+    }
+
+    .chat-row-content{
+      min-width:0;
+      flex:1;
+    }
+
+    .chat-row-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .chat-row-name{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:12px;
+      font-weight:850;
+    }
+
+    .chat-row-time{
+      flex:0 0 auto;
+      color:var(--muted);
+      font-size:9px;
+    }
+
+    .chat-row-bottom{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:4px;
+    }
+
+    .chat-row-preview{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:var(--muted);
+      font-size:10px;
+    }
+
+    .chat-row-unread{
+      min-width:18px;
+      height:18px;
+      padding:0 5px;
+      display:grid;
+      place-items:center;
+      border-radius:999px;
+      background:#E53E3E;
+      color:#fff;
+      font-size:9px;
+      font-weight:900;
+    }
+
+    .chat-empty-small{
+      padding:22px 18px;
+      text-align:center;
+      color:var(--muted);
+      font-size:11px;
+    }
+
+    .chat-create-group{
+      margin:0 16px 6px;
+      width:calc(100% - 32px);
+      justify-content:center;
+    }
+
+    .chat-main{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+      min-height:0;
+      background:#F5F7FA;
+    }
+
+    .chat-header{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-height:72px;
+      padding:12px 20px;
+      background:#fff;
+      border-bottom:1px solid var(--line);
+    }
+
+    .chat-header-avatar{
+      width:42px;
+      height:42px;
+      flex:0 0 42px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:linear-gradient(135deg,var(--header),var(--header2));
+      color:var(--primary);
+      font-size:11px;
+      font-weight:900;
+    }
+
+    .chat-header-avatar.group{
+      background:color-mix(in srgb,var(--primary) 20%,#fff);
+      color:var(--header);
+      font-size:17px;
+    }
+
+    .chat-header-info{
+      min-width:0;
+    }
+
+    .chat-header-info strong{
+      display:block;
+      font-size:14px;
+      color:var(--header);
+    }
+
+    .chat-header-info small{
+      display:block;
+      margin-top:3px;
+      color:var(--muted);
+      font-size:10px;
+    }
+
+    .chat-header-actions{
+      margin-left:auto;
+      display:flex;
+      gap:7px;
+    }
+
+    .chat-header-btn{
+      width:34px;
+      height:34px;
+      border:1px solid var(--line);
+      border-radius:9px;
+      background:#fff;
+      color:#596579;
+    }
+
+    .chat-messages{
+      flex:1;
+      min-height:0;
+      overflow-y:auto;
+      padding:24px 24px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+    }
+
+    .chat-date-divider{
+      align-self:center;
+      margin:4px 0 10px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:#E8EDF3;
+      color:#778295;
+      font-size:9px;
+      font-weight:800;
+    }
+
+    .chat-message{
+      max-width:min(70%,520px);
+      align-self:flex-start;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+    }
+
+    .chat-message.mine{
+      align-self:flex-end;
+      align-items:flex-end;
+    }
+
+    .chat-message-sender{
+      margin:0 0 4px 5px;
+      color:#697588;
+      font-size:9px;
+      font-weight:800;
+    }
+
+    .chat-message-bubble{
+      padding:9px 12px 7px;
+      border-radius:13px 13px 13px 4px;
+      background:#fff;
+      border:1px solid #E6EAF0;
+      box-shadow:0 2px 7px rgba(15,31,55,.05);
+    }
+
+    .chat-message.mine .chat-message-bubble{
+      border-radius:13px 13px 4px 13px;
+      background:color-mix(in srgb,var(--primary) 24%,#fff);
+      border-color:color-mix(in srgb,var(--primary) 40%,#fff);
+    }
+
+    .chat-message-text{
+      color:var(--text);
+      font-size:12px;
+      line-height:1.55;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+    }
+
+    .chat-message-time{
+      margin-top:4px;
+      text-align:right;
+      color:#8993A2;
+      font-size:8px;
+    }
+
+    .chat-welcome{
+      flex:1;
+      display:grid;
+      place-items:center;
+      padding:30px;
+      text-align:center;
+    }
+
+    .chat-welcome-icon{
+      width:68px;
+      height:68px;
+      margin:0 auto 14px;
+      display:grid;
+      place-items:center;
+      border-radius:50%;
+      background:color-mix(in srgb,var(--primary) 18%,#fff);
+      color:var(--header);
+      font-size:28px;
+    }
+
+    .chat-welcome h3{
+      margin:0 0 6px;
+      font-size:18px;
+      color:var(--header);
+    }
+
+    .chat-welcome p{
+      max-width:360px;
+      margin:0 auto;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.6;
+    }
+
+    .chat-compose{
+      display:flex;
+      align-items:flex-end;
+      gap:9px;
+      padding:12px 16px;
+      background:#fff;
+      border-top:1px solid var(--line);
+    }
+
+    .chat-compose textarea{
+      flex:1;
+      min-height:42px;
+      max-height:120px;
+      resize:none;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:11px 13px;
+      background:#F7F9FC;
+      color:var(--text);
+      outline:none;
+      font-size:12px;
+    }
+
+    .chat-compose textarea:focus{
+      background:#fff;
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent);
+    }
+
+    .chat-send-btn{
+      min-width:72px;
+      height:42px;
+    }
+
+    .chat-mobile-back{
+      display:none;
+    }
+
+    @media(max-width:900px){
+      .chat-shell{
+        grid-template-columns:280px minmax(0,1fr);
+      }
+
+      .chat-message{
+        max-width:78%;
+      }
+    }
+
+    @media(max-width:760px){
+      .chat-shell{
+        height:calc(100vh - 132px);
+        min-height:560px;
+        grid-template-columns:1fr;
+        border-radius:14px;
+      }
+
+      .chat-shell.mobile-conversation .chat-sidebar{
+        display:none;
+      }
+
+      .chat-shell:not(.mobile-conversation) .chat-main{
+        display:none;
+      }
+
+      .chat-sidebar{
+        border-right:0;
+      }
+
+      .chat-header{
+        min-height:62px;
+        padding:10px 12px;
+      }
+
+      .chat-mobile-back{
+        display:grid;
+        place-items:center;
+        width:34px;
+        height:34px;
+        border:0;
+        border-radius:9px;
+        background:#F3F6FA;
+        color:var(--header);
+      }
+
+      .chat-messages{
+        padding:18px 12px;
+      }
+
+      .chat-message{
+        max-width:86%;
+      }
+
+      .chat-compose{
+        padding:9px;
+      }
+
+      .chat-send-btn{
+        min-width:54px;
+        padding-left:10px;
+        padding-right:10px;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="root"><div class="loading"><div><div class="spinner"></div>Loading trackerâ€¦</div></div></div>
+  <div id="toast"></div>
+<script>
+'use strict';
+
+const state = {
+  token: localStorage.getItem('tt_live_token') || '',
+  user: null, company: null, members: [], tasks: [], attendance: [], notifications: [], chatConversations: [], chatMessages: [], chatCurrent: null, chatUnread: {}, chatLoading: false, chatSending: false,
+  tab: 'work', workDate: localDate(), recordMember: 'all', taskFilterMember: 'all', taskFilterStatus: 'all',
+  modal: null, editingTask: null, editingMember: null, notificationsOpen: false, busy: false
+};
+let pollTimer = null;
+function localDate(date = new Date()) {
+  const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,'0'), d = String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function esc(value='') { return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+function initials(name='User') { return name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase(); }
+function niceRole(role='') { return role === 'sales' ? 'Team Member (Sales)' : role.charAt(0).toUpperCase()+role.slice(1); }
+function formatDate(value) { if(!value) return ''; return new Date(value+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',day:'2-digit',month:'short',year:'numeric'}); }
+function dateParts(value) { const d=new Date(value+'T00:00:00'); return {num:String(d.getDate()).padStart(2,'0'),day:d.toLocaleDateString(undefined,{weekday:'long'}),month:d.toLocaleDateString(undefined,{month:'long',year:'numeric'})}; }
+function formatDateTime(value) { if(!value) return ''; return new Date(value).toLocaleString(); }
+function memberById(id) { return state.members.find(m=>m.id===id); }
+function attendanceFor(memberId,date) { return state.attendance.find(a=>a.memberId===memberId&&a.workDate===date); }
+function tasksFor(memberId,date) { return state.tasks.filter(t=>t.memberId===memberId&&t.taskDate===date); }
+function formatTaskDuration(hours) {
+  const value = Number(hours || 0);
+
+  if (!Number.isFinite(value)) return '0 minutes';
+
+  const totalMinutes = Math.round(value * 60);
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
+  }
+
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (!minutes) {
+    return `${wholeHours} hour${wholeHours === 1 ? '' : 's'}`;
+  }
+
+  return `${wholeHours} hour${wholeHours === 1 ? '' : 's'} ${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
+function statusPill(status) {
+  const map={
+    'Completed':'completed',
+    'In Progress':'progress',
+    'Pending':'pending',
+    'On Hold':'hold',
+    'Review':'review'
+  };
+
+  return `<span class="pill p-${map[status]||'pending'}">${esc(status)}</span>`;
+}
+function rolePill(role) { return `<span class="pill p-${esc(role)}">${esc(niceRole(role))}</span>`; }
+function isOwner(){return state.user?.role==='owner'} function isManager(){return state.user?.role==='manager'} function isSales(){return state.user?.role==='sales'}
+function visibleMembers(){ return state.members; }
+function canManageTeam(){ return isOwner()||isManager(); }
+function allowedAssignees(){ return canManageTeam()?state.members:state.members.filter(m=>m.id===state.user.id); }
+function unreadCount(){return state.notifications.filter(n=>!n.readAt).length;}
+
+async function chatConversations() {
+  return api('chat.conversations');
+}
+
+async function chatOpenGroup() {
+  return api('chat.open', {
+    method: 'POST',
+    body: { type: 'group' }
+  });
+}
+
+async function chatOpenPrivate(memberId) {
+  return api('chat.open', {
+    method: 'POST',
+    body: {
+      type: 'private',
+      memberId
+    }
+  });
+}
+
+async function chatMessages(conversationId) {
+  return api('chat.messages', {
+    method: 'GET',
+    query: {
+      conversationId
+    }
+  });
+}
+
+async function chatSend(conversationId, message) {
+  return api('chat.send', {
+    method: 'POST',
+    body: {
+      conversationId,
+      message
+    }
+  });
+}
+
+async function chatRead(conversationId) {
+  return api('chat.read', {
+    method: 'POST',
+    body: {
+      conversationId
+    }
+  });
+}
+async function api(action, options={}) {
+  const method = options.method || 'GET';
+
+  async function request() {
+    const headers = {'Accept':'application/json'};
+
+    if (state.token) {
+      headers.Authorization = `Bearer ${state.token}`;
+    }
+
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    return fetch(
+      `/api?action=${encodeURIComponent(action)}`,
+      {
+        method,
+        headers,
+        body: options.body === undefined
+          ? undefined
+          : JSON.stringify(options.body)
+      }
+    );
+  }
+
+  let response = await request();
+
+  /*
+   * A temporary 401 during polling should not immediately
+   * destroy the user's session. Retry once.
+   */
+  if (response.status === 401 && action !== 'login') {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    response = await request();
+  }
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {}
+
+  /*
+   * Only log out after the retry also confirms that
+   * the session is invalid.
+   */
+  if (response.status === 401 && action !== 'login') {
+    logout(false);
+    throw new Error(data.error || 'Session expired.');
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed.');
+  }
+
+  return data;
+}
+
+function toast(message,type='ok'){
+  const el=document.getElementById('toast'); if(!el)return;
+  el.innerHTML=`<div class="toast ${type==='err'?'err':'ok'}">${esc(message)}</div>`;
+  setTimeout(()=>{el.innerHTML='';},3500);
+}
+function setBrand(){
+  const c=state.company||{};
+  document.documentElement.style.setProperty('--primary',c.primary_color||'#C9A84C');
+  document.documentElement.style.setProperty('--header',c.header_color||'#0B1730');
+  document.documentElement.style.setProperty('--header2',c.header_color_2||'#1A3560');
+  document.title=(c.name||'Team Task Tracker')+' â€” Task Tracker';
+}
+function brandLogo(size='normal'){
+  const logo=state.company?.logo_data_url;
+  return `<div class="brand-logo">${logo?`<img src="${esc(logo)}" alt="logo">`:esc(initials(state.company?.name||'TT'))}</div>`;
+}
+
+async function login(event){
+  event.preventDefault(); const form=new FormData(event.target); const btn=event.target.querySelector('button');
+  const error=document.getElementById('loginError'); error.innerHTML=''; btn.disabled=true; btn.textContent='Signing inâ€¦';
+  try{
+    const data=await api('login',{method:'POST',body:{employeeId:form.get('employeeId'),pin:form.get('pin')}});
+    state.token=data.token; localStorage.setItem('tt_live_token',state.token); state.user=data.user; state.company=data.company; setBrand();
+    await loadData(); startPolling();
+  }catch(e){error.innerHTML=`<div class="error">${esc(e.message)}</div>`;}
+  finally{btn.disabled=false;btn.textContent='Sign In â†’';}
+}
+function logout(confirmFirst=true){
+  if(confirmFirst&&!confirm('Sign out?'))return;
+  state.token='';state.user=null;localStorage.removeItem('tt_live_token');clearInterval(pollTimer);pollTimer=null;renderLogin();
+}
+
+const TRACKER_START_DATE = '2026-08-15';
+
+function isSundayDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+function nextWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  d.setUTCDate(d.getUTCDate() + 1);
+
+  if (d.getUTCDay() === 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+
+  return d.toISOString().slice(0, 10);
+}
+
+function isWorkDateFinished(date) {
+  return !!attendanceFor(state.user.id, date)?.finishedAt;
+}
+
+function getUnlockedWorkDate() {
+  const today = localDate();
+
+  if (today < TRACKER_START_DATE) {
+    return TRACKER_START_DATE;
+  }
+
+  return today;
+}
+function setUnlockedWorkDate() {
+  if (!state.user?.id) return;
+
+  const unlocked = getUnlockedWorkDate();
+
+  if (unlocked) {
+    state.workDate = unlocked;
+  }
+}
+
+async function loadData(show=true){
+  if(!state.token)return renderLogin();
+
+  try{
+    const data=await api('bootstrap');
+
+    Object.assign(state,{
+      user:data.user,
+      company:data.company,
+      members:data.members,
+      tasks:data.tasks,
+      attendance:data.attendance,
+      notifications:data.notifications
+    });
+
+    setUnlockedWorkDate();
+
+    setBrand();
+    renderApp();
+  }catch(e){
+    if(show)toast(e.message,'err');
+  }
+}
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer=setInterval(()=>{
+    if(state.token && !state.busy && !state.modal){
+      loadData(false);
+    }
+  },15000);
+}
+function canSelectWorkDate(date) {
+  if (!date) return false;
+  if (date < TRACKER_START_DATE) return false;
+  if (date > localDate()) return false;
+
+  // Sunday is optional and can always be opened when it is today.
+  if (isSundayDate(date)) {
+    return date === localDate();
+  }
+
+  // Other dates follow the sequential required-workday rule.
+  return date === getUnlockedWorkDate();
+}
+function changeWorkDate(value) {
+  const selected = value || localDate();
+  const unlocked = getUnlockedWorkDate();
+
+  if (!canSelectWorkDate(selected)) {
+    if (selected < TRACKER_START_DATE) {
+      toast('Task Tracker starts from Monday, 10 August 2026.', 'err');
+    } else if (isSundayDate(selected)) {
+      toast('Sunday is optional. You can add tasks or skip it.', 'err');
+    } else if (selected > unlocked) {
+      toast(`Finish ${formatDate(unlocked)} before starting ${formatDate(selected)}.`, 'err');
+    } else {
+      toast('That work date is locked.', 'err');
+    }
+    return;
+  }
+
+  state.workDate = selected;
+  renderApp();
+}
+
+function renderLogin(){
+  const c=state.company||{name:'Team Task Tracker',tagline:'Shared team productivity portal'};setBrand();
+  document.getElementById('root').innerHTML=`
+    <main class="login"><section class="login-card">
+      <div class="brand">${brandLogo()}<div><h1>${esc(c.name||'Team Task Tracker')}</h1><p>${esc(c.tagline||'Shared team productivity portal')}</p></div></div>
+      <h2>Welcome back &#128075;</h2><p class="sub">Sign in with the Employee ID and PIN given by your Owner.</p>
+      <form onsubmit="login(event)">
+        <div class="field"><label>Employee ID</label><input name="employeeId" autocomplete="username" placeholder="OWNER or EMP-001" required></div>
+        <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="current-password" placeholder="4-8 digits" required></div>
+        <div id="loginError"></div><button class="btn btn-dark full" type="submit">Sign In &rarr;</button>
+      </form>
+
+    </section></main>`;
+}
+
+function renderApp(){
+  if(!state.user)return renderLogin();
+  const c=state.company||{}; const tabs=[['work','&#128203; My Work'],...(canManageTeam()?[['team','&#128101; Team'],['tasks','&#9989; Team Tasks']]:[]),['records','&#128202; Daily Records'],['chat','&#128172; Chat'],...(isOwner()?[['settings','&#9881; Settings']]:[])];
+  document.getElementById('root').innerHTML=`
+    <div class="app"><header class="header"><div class="header-inner">
+      <div class="brand">${brandLogo()}<div><h1>${esc(c.name||'Team Task Tracker')}</h1><p>${esc(c.tagline||'Team productivity portal')}</p></div></div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="openRing()" title="Ring">&#128276;</button>
+        <button class="icon-btn" onclick="toggleNotifications()" title="Notifications">&#128276;${unreadCount()?`<span class="badge">${unreadCount()}</span>`:''}</button>
+        <div class="user-chip"><div class="avatar">${esc(initials(state.user.name))}</div><div><strong>${esc(state.user.name)}</strong><span>${esc(niceRole(state.user.role))}</span></div></div>
+        <button class="icon-btn" onclick="logout()" title="Sign out">Sign Out</button>
+      </div>
+    </div></header>
+    <div class="layout"><aside class="sidebar"><div class="nav-title">Workspace</div>${tabs.map(([id,label])=>`<button class="nav-btn ${state.tab===id?'active':''}" onclick="goTab('${id}')">${label}</button>`).join('')}</aside>
+    <main class="content">${renderCurrentTab()}</main></div></div>
+    ${state.notificationsOpen?renderNotifications():''}${renderModal()}`;
+}
+async function goTab(tab){
+  if(tab !== 'chat'){
+    stopChatPolling();
+  }
+
+  state.tab=tab;
+  state.modal=null;
+  state.notificationsOpen=false;
+
+  renderApp();
+
+  if(tab==='chat'){
+    await loadChatConversations();
+
+    if(state.chatCurrent){
+      startChatPolling();
+    }
+  }
+}
+async function loadChatConversations(){
+  state.chatLoading = true;
+
+  try {
+    const result = await chatConversations();
+    state.chatConversations = result.conversations || [];
+    state.chatUnread = result.unreadByConversation || {};
+    state.chatLoading = false;
+    renderApp();
+  } catch(e) {
+    state.chatLoading = false;
+    toast(e.message || 'Unable to load conversations.','err');
+  }
+}
+
+async function openExistingChat(conversationId){
+  const conversation = (state.chatConversations || [])
+    .find(c => c.id === conversationId);
+
+  if (!conversation) {
+    toast('Conversation not found.','err');
+    return;
+  }
+
+  state.chatCurrent = conversation;
+  state.chatMessages = [];
+
+  await loadChatMessages(conversation.id);
+}
+async function openTeamChat(){
+  try {
+    state.chatLoading = true;
+    renderApp();
+
+    const result = await chatOpenGroup();
+
+    state.chatCurrent = result.conversation;
+    state.chatLoading = false;
+
+    await loadChatMessages(result.conversation.id);
+    startChatPolling();
+  } catch(e) {
+    state.chatLoading = false;
+    toast(e.message || 'Unable to open Team Chat.','err');
+    renderApp();
+  }
+}
+
+async function openPrivateChat(memberId){
+  try {
+    state.chatLoading = true;
+    renderApp();
+
+    const result = await chatOpenPrivate(memberId);
+
+    state.chatCurrent = result.conversation;
+    state.chatLoading = false;
+
+    await loadChatMessages(result.conversation.id);
+    startChatPolling();
+  } catch(e) {
+    state.chatLoading = false;
+    toast(e.message || 'Unable to open private chat.','err');
+    renderApp();
+  }
+}
+
+let chatPollTimer = null;
+
+function stopChatPolling(){
+  if (chatPollTimer){
+    clearInterval(chatPollTimer);
+    chatPollTimer = null;
+  }
+}
+
+function startChatPolling(){
+  stopChatPolling();
+
+  chatPollTimer = setInterval(async () => {
+    if (state.tab !== 'chat' || !state.chatCurrent) return;
+
+    try {
+      const result = await chatMessages(state.chatCurrent.id);
+      const incoming = result.messages || [];
+
+      const oldIds = new Set(
+        (state.chatMessages || []).map(m => m.id)
+      );
+
+      const changed =
+        incoming.length !== (state.chatMessages || []).length ||
+        incoming.some(m => !oldIds.has(m.id));
+
+      if (changed){
+        state.chatMessages = incoming;
+        renderApp();
+
+        setTimeout(() => {
+          const box = document.querySelector('.chat-messages');
+          if (box) box.scrollTop = box.scrollHeight;
+        }, 0);
+      }
+    } catch(e){
+      console.warn('Chat refresh failed:', e);
+    }
+  }, 3000);
+}
+async function loadChatMessages(conversationId){
+  try {
+    const result = await chatMessages(conversationId);
+
+    state.chatMessages = result.messages || [];
+
+    await chatRead(conversationId);
+
+    renderApp();
+
+    setTimeout(() => {
+      const box = document.querySelector('.chat-messages');
+      if (box) box.scrollTop = box.scrollHeight;
+    }, 0);
+  } catch(e) {
+    toast(e.message || 'Unable to load messages.','err');
+  }
+}
+async function sendChatMessage(event){
+  event.preventDefault();
+
+  if (!state.chatCurrent || state.chatSending) return;
+
+  const form = event.currentTarget;
+  const input = form.elements.message;
+  const message = String(input?.value || '').trim();
+
+  if (!message) return;
+
+  state.chatSending = true;
+
+  try {
+    const result = await chatSend(
+      state.chatCurrent.id,
+      message
+    );
+
+    if (result.message) {
+      state.chatMessages = [
+        ...state.chatMessages,
+        result.message
+      ];
+    }
+
+    input.value = '';
+    state.chatSending = false;
+
+    renderApp();
+
+    setTimeout(() => {
+      const box = document.querySelector('.chat-messages');
+      if (box) box.scrollTop = box.scrollHeight;
+    }, 0);
+
+  } catch(e) {
+    state.chatSending = false;
+    toast(e.message || 'Unable to send message.','err');
+    renderApp();
+  }
+}
+function renderChat(){
+  const current = state.chatCurrent;
+  const messages = state.chatMessages || [];
+  const conversations = state.chatConversations || [];
+  const members = (state.members || []).filter(m =>
+    m.id !== state.user?.id && m.active
+  );
+
+  const groups = conversations.filter(c => c.conversation_type === 'group');
+  const privateChats = conversations.filter(c => c.conversation_type !== 'group');
+
+  const currentId = current?.id || '';
+
+  const conversationInitials = (conversation) => {
+    if (conversation?.conversation_type === 'group') return '👥';
+
+    const member = members.find(m =>
+      conversation?.name &&
+      String(conversation.name).toLowerCase().includes(String(m.name || '').toLowerCase())
+    );
+
+    return member ? initials(member.name) : 'CH';
+  };
+
+  const conversationPreview = (conversation) => {
+    const latest = (conversation?.messages || [])[0];
+    if (latest?.message) return latest.message;
+    if (conversation?.conversation_type === 'group') return 'Group conversation';
+    return 'Private conversation';
+  };
+
+  const conversationTime = (conversation) => {
+    const latest = (conversation?.messages || [])[0];
+    return latest?.created_at
+      ? formatDateTime(latest.created_at)
+      : '';
+  };
+
+  const renderConversationRow = (conversation) => {
+    const unread = Number(state.chatUnread?.[conversation.id] || 0);
+    const isGroup = conversation.conversation_type === 'group';
+    const name = conversation.name || (isGroup ? 'Group Chat' : 'Private Chat');
+
+    return `
+      <button
+        type="button"
+        class="chat-row ${currentId === conversation.id ? 'active' : ''}"
+        onclick="openExistingChat('${conversation.id}')"
+      >
+        <span class="chat-row-avatar ${isGroup ? 'group' : ''}">
+          ${isGroup ? '👥' : esc(conversationInitials(conversation))}
+          ${!isGroup ? '<span class="chat-online-dot"></span>' : ''}
+        </span>
+
+        <span class="chat-row-content">
+          <span class="chat-row-top">
+            <span class="chat-row-name">${esc(name)}</span>
+            <span class="chat-row-time">${esc(conversationTime(conversation))}</span>
+          </span>
+
+          <span class="chat-row-bottom">
+            <span class="chat-row-preview">${esc(conversationPreview(conversation))}</span>
+            ${unread
+              ? `<span class="chat-row-unread">${unread > 99 ? '99+' : unread}</span>`
+              : ''}
+          </span>
+        </span>
+      </button>
+    `;
+  };
+
+  const renderMemberRow = (member) => {
+    const existing = privateChats.find(c =>
+      String(c.name || '').toLowerCase() === String(member.name || '').toLowerCase()
+    );
+
+    return `
+      <button
+        type="button"
+        class="chat-row ${existing?.id === currentId ? 'active' : ''}"
+        onclick="openPrivateChat('${member.id}')"
+      >
+        <span class="chat-row-avatar">
+          ${esc(initials(member.name))}
+          <span class="chat-online-dot"></span>
+        </span>
+
+        <span class="chat-row-content">
+          <span class="chat-row-top">
+            <span class="chat-row-name">${esc(member.name)}</span>
+          </span>
+
+          <span class="chat-row-bottom">
+            <span class="chat-row-preview">${esc(member.role || member.employeeId || 'Team member')}</span>
+          </span>
+        </span>
+      </button>
+    `;
+  };
+
+  const currentName = current?.name || 'Chat';
+  const currentIsGroup = current?.conversation_type === 'group';
+
+  const currentMember = !currentIsGroup
+    ? members.find(m =>
+        String(currentName).toLowerCase().includes(String(m.name || '').toLowerCase())
+      )
+    : null;
+
+  const currentInitials = currentIsGroup
+    ? '👥'
+    : currentMember
+      ? initials(currentMember.name)
+      : initials(currentName);
+
+  return `
+    <div class="page-head">
+      <div>
+        <h2>Chat</h2>
+        <p>Private and team conversations.</p>
+      </div>
+    </div>
+
+    <section class="chat-shell ${current ? 'mobile-conversation' : ''}">
+
+      <aside class="chat-sidebar">
+
+        <div class="chat-sidebar-head">
+          <div class="chat-sidebar-title">
+            <h3>Chat</h3>
+            ${isOwner()
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  onclick="openCreateChatGroup()"
+                >
+                  + Group
+                </button>
+              `
+              : ''}
+          </div>
+
+          <div class="chat-search">
+            <span class="chat-search-icon">🔍</span>
+            <input
+              type="search"
+              id="chatSearchInput"
+              placeholder="Search conversations..."
+              oninput="filterChatSidebar(this.value)"
+            >
+          </div>
+        </div>
+
+        <div class="chat-sidebar-body">
+
+          <div class="chat-section-label">Groups</div>
+
+          <div class="chat-list" id="chatGroupList">
+            ${
+              groups.length
+                ? groups.map(renderConversationRow).join('')
+                : `
+                  <div class="chat-empty-small">
+                    No groups yet.
+                  </div>
+                `
+            }
+          </div>
+
+          <div class="chat-section-label">Private Chats</div>
+
+          <div class="chat-list" id="chatPrivateList">
+            ${
+              privateChats.length
+                ? privateChats.map(renderConversationRow).join('')
+                : ''
+            }
+
+            ${
+              members
+                .filter(m => !privateChats.some(c =>
+                  String(c.name || '').toLowerCase() === String(m.name || '').toLowerCase()
+                ))
+                .map(renderMemberRow)
+                .join('')
+            }
+
+            ${
+              !members.length && !privateChats.length
+                ? `
+                  <div class="chat-empty-small">
+                    No active team members.
+                  </div>
+                `
+                : ''
+            }
+          </div>
+
+        </div>
+      </aside>
+
+      <main class="chat-main">
+
+        ${
+          current
+            ? `
+              <div class="chat-header">
+
+                <button
+                  type="button"
+                  class="chat-mobile-back"
+                  onclick="closeMobileChat()"
+                  aria-label="Back to conversations"
+                >
+                  ←
+                </button>
+
+                <div class="chat-header-avatar ${currentIsGroup ? 'group' : ''}">
+                  ${currentIsGroup ? '👥' : esc(currentInitials)}
+                </div>
+
+                <div class="chat-header-info">
+                  <strong>${esc(currentName)}</strong>
+                  <small>
+                    ${
+                      currentIsGroup
+                        ? 'Group conversation'
+                        : esc(currentMember?.role || 'Private conversation')
+                    }
+                  </small>
+                </div>
+
+              </div>
+
+              <div class="chat-messages">
+
+                ${
+                  messages.length
+                    ? messages.map(m => `
+                        <div class="chat-message ${m.sender_id === state.user?.id ? 'mine' : ''}">
+
+                          ${
+                            m.sender_id !== state.user?.id && currentIsGroup
+                              ? `
+                                <div class="chat-message-sender">
+                                  ${esc(m.sender?.name || 'Unknown')}
+                                </div>
+                              `
+                              : ''
+                          }
+
+                          <div class="chat-message-bubble">
+                            <div class="chat-message-text">
+                              ${esc(m.message)}
+                            </div>
+
+                            <div class="chat-message-time">
+                              ${esc(formatDateTime(m.created_at))}
+                            </div>
+                          </div>
+
+                        </div>
+                      `).join('')
+                    : `
+                      <div class="chat-welcome">
+                        <div>
+                          <div class="chat-welcome-icon">💬</div>
+                          <h3>Start the conversation</h3>
+                          <p>
+                            Send a message to ${esc(currentName)}.
+                          </p>
+                        </div>
+                      </div>
+                    `
+                }
+
+              </div>
+
+              <form
+                class="chat-compose"
+                onsubmit="sendChatMessage(event)"
+              >
+                <textarea
+                  name="message"
+                  rows="1"
+                  maxlength="4000"
+                  placeholder="Write a message..."
+                  required
+                  onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();this.form.requestSubmit();}"
+                ></textarea>
+
+                <button
+                  class="btn btn-primary chat-send-btn"
+                  type="submit"
+                  ${state.chatSending ? 'disabled' : ''}
+                >
+                  ${state.chatSending ? '...' : 'Send'}
+                </button>
+              </form>
+            `
+            : `
+              <div class="chat-welcome">
+                <div>
+                  <div class="chat-welcome-icon">💬</div>
+                  <h3>Select a conversation</h3>
+                  <p>
+                    Choose a group or team member from the left to start chatting.
+                  </p>
+                </div>
+              </div>
+            `
+        }
+
+      </main>
+
+    </section>
+  `;
+}
+
+function filterChatSidebar(query){
+  const q = String(query || '').trim().toLowerCase();
+
+  document.querySelectorAll('.chat-list .chat-row').forEach(row => {
+    row.style.display = !q || row.innerText.toLowerCase().includes(q)
+      ? ''
+      : 'none';
+  });
+}
+
+function closeMobileChat(){
+  state.chatCurrent = null;
+  state.chatMessages = [];
+  stopChatPolling();
+  renderApp();
+}function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();if(state.tab==='chat')return renderChat();return renderWork();}
+
+function renderWork(){
+  const date=state.workDate;const mine=tasksFor(state.user.id,date);const attendance=attendanceFor(state.user.id,date);const totalHours=mine.reduce((s,t)=>s+Number(t.hours||0),0);const completed=mine.filter(t=>t.status==='Completed').length;
+  const companyTasksToday=state.tasks.filter(t=>t.taskDate===date); const stats=canManageTeam()?[
+    ['Team Members',state.members.length,'Active users visible to you'],['Tasks on Date',companyTasksToday.length,formatDate(date)],['Completed',companyTasksToday.filter(t=>t.status==='Completed').length,'Across visible team'],['Logged Hours',companyTasksToday.reduce((s,t)=>s+Number(t.hours||0),0).toFixed(1),'Across visible team']
+  ]:[['My Tasks',mine.length,formatDate(date)],['Completed',completed,'Tasks completed'],['Hours',totalHours.toFixed(1),'Task hours recorded'],['Day',attendance?.finishedAt?'Finished':attendance?.loginTime?'On Duty':'Not Started',attendance?.loginTime?`${attendance.loginTime} – ${attendance.logoutTime||'...'}`:'Select times below']];
+  return `<div class="page-head"><div><h2>My Work</h2><p>Add tasks, select attendance times, and finish the day.</p></div><div class="actions"><button class="btn btn-primary" onclick="openVideoCall()">&#128222; Video Call</button><button class="btn btn-primary" onclick="openRing()">&#128276; Ring</button></div></div>
+    <section class="grid stats">${stats.map(s=>`<div class="stat"><div class="label">${esc(s[0])}</div><div class="value">${esc(s[1])}</div><div class="meta">${esc(s[2])}</div></div>`).join('')}</section>
+    <section class="card"><div class="card-head"><div><h3>&#128338; Attendance</h3><p>You choose the official login and logout times.</p></div><span><span class="status-dot ${attendance?.finishedAt?'done':attendance?.loginTime?'on':''}"></span>${attendance?.finishedAt?'Day Finished':attendance?.loginTime?'On Duty':'Off Duty'}</span></div>
+      <div class="attendance"><div class="field"><label>Work Date</label><input
+  type="date"
+  value="${esc(date)}"
+  max="${esc(localDate())}"
+  onchange="changeWorkDate(this.value)"
+></div><div class="field">
+  <label>Login Time</label>
+  <input
+    id="loginTime"
+    type="time"
+    min="09:00"
+    value="${esc(attendance?.loginTime||'09:00')}"
+    ${attendance?.finishedAt?'disabled':''}
+  >
+</div>
+
+<button
+  class="btn btn-green"
+  onclick="saveAttendance('login')"
+  ${attendance?.finishedAt?'disabled':''}
+>
+  ${attendance?.loginTime ? '&#10003; Saved Login' : 'Save Login'}
+</button>
+
+<div class="field">
+  <label>Logout Time</label>
+  <input
+    id="logoutTime"
+    type="time"
+    min="09:00"
+    max="23:59"
+    value="${esc(attendance?.logoutTime||'18:00')}"
+    ${attendance?.finishedAt?'disabled':''}
+  >
+</div>
+
+<button
+  class="btn btn-danger"
+  onclick="saveAttendance('logout')"
+  ${attendance?.finishedAt?'disabled':''}
+>
+  ${attendance?.logoutTime ? '&#10003; Saved Logout' : 'Save Logout'}
+</button><button class="btn btn-dark" onclick="finishDay()" ${attendance?.finishedAt?'disabled':''}>&#9989; Finish Day</button></div>
+      ${attendance?.finishedAt?`<div class="success">Finished on ${esc(formatDateTime(attendance.finishedAt))}. This day is stored permanently and synced to Google Sheets.</div>`:''}
+    </section>
+    ${renderAddTaskCard()}
+    <section class="card"><div class="card-head"><div><h3>Tasks for ${esc(formatDate(date))}</h3><p>${mine.length} task(s), ${totalHours.toFixed(1)} total hour(s)</p></div></div>${renderTaskTable(mine,true)}</section>
+    ${attendance?.finishedAt?renderOneDayBlock(state.user.id,date):''}`;
+}
+function isSundayDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+function previousRequiredWorkDate(date) {
+  const [year, month, day] = String(date).split('-').map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = current.getUTCDay();
+
+  if (dayOfWeek === 0) return null;
+
+  if (dayOfWeek === 1) {
+    current.setUTCDate(current.getUTCDate() - 2);
+  } else {
+    current.setUTCDate(current.getUTCDate() - 1);
+  }
+
+  return current.toISOString().slice(0, 10);
+}
+
+function isWorkDateFinished(date) {
+  return !!attendanceFor(state.user.id, date)?.finishedAt;
+}
+
+/* =========================
+   ADD YOUR TASK
+   DAILY 1-3-5 FLOW
+   ========================= */
+
+const HUDDLE_STAGES = {
+  High: {
+    min: 1,
+    max: 1,
+    durations: [
+      { value: 4, label: '4 hours' },
+      { value: 4.5, label: '4 hours 30 minutes' },
+      { value: 5, label: '5 hours' },
+      { value: 5.5, label: '5 hours 30 minutes' },
+      { value: 6, label: '6 hours' }
+    ]
+  },
+
+  Medium: {
+    min: 3,
+    max: 5,
+    durations: [
+      { value: 0.5, label: '30 minutes' },
+      { value: 2 / 3, label: '40 minutes' },
+      { value: 0.75, label: '45 minutes' }
+    ]
+  },
+
+  Low: {
+    min: 5,
+    max: 7,
+    durations: [
+      { value: 0.25, label: '15 minutes' },
+      { value: 1 / 3, label: '20 minutes' },
+      { value: 5 / 12, label: '25 minutes' }
+    ]
+  }
+};
+
+let huddleRows = {
+  High: [],
+  Medium: [],
+  Low: []
+};
+
+let huddleSaved = {
+  High: false,
+  Medium: false,
+  Low: false
+};
+
+function huddleConfig(priority) {
+  return HUDDLE_STAGES[priority] || HUDDLE_STAGES.High;
+}
+
+function huddleDurationOptions(priority) {
+  return huddleConfig(priority).durations;
+}
+
+function huddleToday() {
+  return state.workDate || TRACKER_START_DATE;
+}
+
+function defaultHuddleRow(priority) {
+  const options = huddleDurationOptions(priority);
+
+  return {
+    title: '',
+    hours: options[0].value,
+    status: 'Pending',
+    notes: ''
+  };
+}
+
+function ensureHuddleRows(priority) {
+  const config = huddleConfig(priority);
+
+  if (!Array.isArray(huddleRows[priority])) {
+    huddleRows[priority] = [];
+  }
+
+  while (huddleRows[priority].length < config.min) {
+    huddleRows[priority].push(
+      defaultHuddleRow(priority)
+    );
+  }
+
+  if (huddleRows[priority].length > config.max) {
+    huddleRows[priority] =
+      huddleRows[priority].slice(0, config.max);
+  }
+}
+
+function ensureAllHuddleRows() {
+  ensureHuddleRows('High');
+  ensureHuddleRows('Medium');
+  ensureHuddleRows('Low');
+}
+
+function updateHuddleField(priority, index, field, value) {
+  if (!huddleRows[priority]?.[index]) {
+    return;
+  }
+
+  huddleRows[priority][index][field] = value;
+}
+
+function addHuddleRow(priority) {
+  const config = huddleConfig(priority);
+
+  if (huddleSaved[priority]) {
+    return toast(
+      `${priority} tasks are already saved.`,
+      'err'
+    );
+  }
+
+  if (!Array.isArray(huddleRows[priority])) {
+    huddleRows[priority] = [];
+  }
+
+  if (huddleRows[priority].length >= config.max) {
+    return toast(
+      `Maximum ${config.max} ${priority} tasks allowed.`,
+      'err'
+    );
+  }
+
+  huddleRows[priority].push(
+    defaultHuddleRow(priority)
+  );
+
+  renderApp();
+}
+
+function huddlePriorityTitle(priority) {
+  if (priority === 'High') {
+    return 'High Priority';
+  }
+
+  if (priority === 'Medium') {
+    return 'Medium Priority';
+  }
+
+  return 'Low Priority';
+}
+
+function renderHuddleSection(priority) {
+  ensureHuddleRows(priority);
+
+  const config = huddleConfig(priority);
+  const rows = huddleRows[priority];
+  const saved = huddleSaved[priority];
+  const durationOptions = huddleDurationOptions(priority);
+
+  const headingClass =
+    priority === 'High'
+      ? 'huddle-stage-high'
+      : priority === 'Medium'
+        ? 'huddle-stage-medium'
+        : 'huddle-stage-low';
+
+  return `
+    <section class="card huddle-card">
+
+      <div class="card-head huddle-header">
+        <div>
+          <h3>${esc(huddlePriorityTitle(priority))}</h3>
+        </div>
+
+        <span class="huddle-stage-badge ${headingClass}">
+          ${saved ? 'Saved' : priority}
+        </span>
+      </div>
+
+      <div class="huddle-list">
+
+        ${rows.map((row, i) => `
+          <article class="huddle-row">
+
+            <div class="huddle-row-head">
+
+              <strong>
+                ${esc(priority)} Task ${i + 1}
+              </strong>
+
+              <div class="field-inline">
+
+                <label>Status</label>
+
+                <select
+                  ${saved ? 'disabled' : ''}
+                  onchange="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'status',
+                      this.value
+                    )
+                  "
+                >
+
+                  ${[
+                    'Pending',
+                    'In Progress',
+                    'Completed',
+                    'On Hold',
+                    'Review'
+                  ].map(status => `
+                    <option
+                      value="${esc(status)}"
+                      ${row.status === status ? 'selected' : ''}
+                    >
+                      ${esc(status)}
+                    </option>
+                  `).join('')}
+
+                </select>
+
+              </div>
+
+            </div>
+
+            <div class="form-grid">
+
+              <div class="field wide">
+
+                <label>Task Name</label>
+
+                <input
+                  type="text"
+                  value="${esc(row.title)}"
+                  placeholder="Enter task name"
+                  autocomplete="off"
+                  ${saved ? 'disabled' : ''}
+                  oninput="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'title',
+                      this.value
+                    )
+                  "
+                >
+
+              </div>
+
+              <div class="field">
+
+                <label>Duration</label>
+
+                <select
+                  ${saved ? 'disabled' : ''}
+                  onchange="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'hours',
+                      Number(this.value)
+                    )
+                  "
+                >
+
+                  ${durationOptions.map(option => `
+                    <option
+                      value="${option.value}"
+                      ${
+                        Number(row.hours) === Number(option.value)
+                          ? 'selected'
+                          : ''
+                      }
+                    >
+                      ${esc(option.label)}
+                    </option>
+                  `).join('')}
+
+                </select>
+
+              </div>
+
+              <div class="field wide">
+
+                <label>
+                  Notes
+                  <span class="optional">(Optional)</span>
+                </label>
+
+                <input
+                  type="text"
+                  value="${esc(row.notes)}"
+                  placeholder="Optional notes"
+                  autocomplete="off"
+                  ${saved ? 'disabled' : ''}
+                  oninput="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'notes',
+                      this.value
+                    )
+                  "
+                >
+
+              </div>
+
+            </div>
+
+          </article>
+        `).join('')}
+
+      </div>
+
+      ${
+        !saved && rows.length < config.max
+          ? `
+            <button
+              type="button"
+              class="btn btn-light huddle-add-task"
+              onclick="addHuddleRow('${priority}')"
+            >
+              + Add ${esc(priority)} Task
+            </button>
+          `
+          : ''
+      }
+
+      <div class="huddle-actions">
+
+        ${
+          saved
+            ? `
+              <span class="pill p-completed">
+                ${esc(priority)} Tasks Saved
+              </span>
+            `
+            : `
+              <button
+                type="button"
+                class="btn btn-primary"
+                onclick="saveHuddleTasks('${priority}')"
+                ${state.busy ? 'disabled' : ''}
+              >
+                Save ${esc(priority)} Tasks
+              </button>
+            `
+        }
+
+      </div>
+
+    </section>
+  `;
+}
+
+function renderAddTaskCard() {
+  ensureAllHuddleRows();
+
+  return `
+    <section class="card huddle-card">
+
+      <div class="card-head huddle-header">
+
+        <div>
+          <h3>Add Your Tasks</h3>
+        </div>
+
+      </div>
+
+    </section>
+
+    ${renderHuddleSection('High')}
+    ${renderHuddleSection('Medium')}
+    ${renderHuddleSection('Low')}
+  `;
+}
+
+async function saveHuddleTasks(priority) {
+
+  if (!['High', 'Medium', 'Low'].includes(priority)) {
+    return toast(
+      'Invalid task priority.',
+      'err'
+    );
+  }
+
+  if (huddleSaved[priority]) {
+    return toast(
+      `${priority} tasks are already saved.`,
+      'err'
+    );
+  }
+
+  ensureHuddleRows(priority);
+
+  const config = huddleConfig(priority);
+  const rows = huddleRows[priority];
+
+  if (rows.length < config.min) {
+    return toast(
+      `Minimum ${config.min} ${priority} task${config.min === 1 ? '' : 's'} required.`,
+      'err'
+    );
+  }
+
+  const allowedDurations =
+    huddleDurationOptions(priority)
+      .map(option => Number(option.value));
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const row = rows[i];
+
+    const title =
+      String(row.title || '').trim();
+
+    const hours =
+      Number(row.hours);
+
+    if (!title) {
+      return toast(
+        `${priority} Task ${i + 1}: Task name is required.`,
+        'err'
+      );
+    }
+
+    if (
+      !allowedDurations.some(
+        value =>
+          Math.abs(value - hours) < 0.000001
+      )
+    ) {
+      return toast(
+        `${priority} Task ${i + 1}: Select a valid duration.`,
+        'err'
+      );
+    }
+
+    if (
+      ![
+        'Pending',
+        'In Progress',
+        'Completed',
+        'On Hold',
+        'Review'
+      ].includes(row.status)
+    ) {
+      return toast(
+        `${priority} Task ${i + 1}: Select a valid status.`,
+        'err'
+      );
+    }
+  }
+
+  state.busy = true;
+
+  try {
+
+    const taskDate = huddleToday();
+
+    for (const row of rows) {
+
+      await api(
+        'task.create',
+        {
+          method: 'POST',
+          body: {
+            memberId: state.user.id,
+            title: String(row.title).trim(),
+            taskDate,
+            hours: Number(row.hours),
+            priority,
+            status: row.status,
+            notes: String(row.notes || '').trim()
+          }
+        }
+      );
+
+    }
+
+    huddleSaved[priority] = true;
+
+    toast(
+      `${priority} tasks saved successfully.`
+    );
+
+    await loadData(false);
+
+  } catch (e) {
+
+    toast(
+      e.message,
+      'err'
+    );
+
+  } finally {
+
+    state.busy = false;
+
+  }
+}
+async function saveAttendance(type){
+  const input=document.getElementById(type==='login'?'loginTime':'logoutTime'); if(!input?.value)return toast('Select a time first.','err');state.busy=true;
+  try{await api('attendance.save',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate,[type==='login'?'loginTime':'logoutTime']:input.value}});toast(`${type==='login'?'Login':'Logout'} time saved.`);await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
+}
+async function finishDay(){
+  if(!confirm('Finish this day and create the permanent daily block?'))return;state.busy=true;
+  try{await api('day.finish',{method:'POST',body:{memberId:state.user.id,workDate:state.workDate}});toast('Day finished and synced to Google Sheets.');await loadData(false);}catch(e){toast(e.message,'err')}finally{state.busy=false;}
+}
+
+function renderTaskTable(tasks,own=false){
+  if(!tasks.length)return `<div class="empty"><div class="emoji">ðŸ“‹</div>No tasks found.</div>`;
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Member</th><th>Task</th><th>Hours</th><th>Status</th><th>Assigned By</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${tasks.map(t=>{const member=memberById(t.memberId),assigner=memberById(t.assignedBy);return `<tr><td>${esc(t.taskDate)}</td><td><strong>${esc(member?.name||'Unknown')}</strong><br><small>${esc(member?.employeeId||'')}</small></td><td>${esc(t.title)}</td><td>${formatTaskDuration(t.hours)}</td><td>${statusPill(t.status)}</td><td>${esc(assigner?.name||'Unknown')}</td><td>${esc(t.notes||'—')}</td><td><div class="actions"><button class="btn btn-light btn-sm" onclick="openEditTask('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+}
+async function deleteTask(id){if(!confirm('Delete this task? It will also be removed from Google Sheets.'))return;try{await api('task.delete',{method:'DELETE',body:{id}});toast('Task deleted.');await loadData(false);}catch(e){toast(e.message,'err')}}
+function openEditTask(id){state.editingTask=state.tasks.find(t=>t.id===id);state.modal='task';renderApp();}
+async function updateTask(event){
+  event.preventDefault();
+
+  const form=event.target;
+
+  const draft={
+    id:state.editingTask?.id,
+    title:form.elements.title?.value||'',
+    taskDate:form.elements.taskDate?.value||'',
+    hours:Number(form.elements.hours?.value||0),
+    priority:form.elements.priority?.value||'Medium',
+    status:form.elements.status?.value||'Pending',
+    notes:form.elements.notes?.value||''
+  };
+
+  state.editTaskDraft=draft;
+
+  if(!draft.id){
+    toast('Task not found.','err');
+    return;
+  }
+
+  if(!draft.title.trim()){
+    toast('Task name is required.','err');
+    form.elements.title?.focus();
+    return;
+  }
+
+  try{
+    state.busy=true;
+
+    await api('task.update',{
+      method:'PATCH',
+      body:draft
+    });
+
+    state.busy=false;
+    state.modal=null;
+    state.editingTask=null;
+    state.editTaskDraft=null;
+
+    toast('Task updated successfully.');
+    await loadData(false);
+
+  }catch(e){
+    state.busy=false;
+
+    // KEEP THE MODAL OPEN AND KEEP EVERYTHING THE USER TYPED.
+    state.editTaskDraft=draft;
+
+    toast(e.message,'err');
+  }
+}
+function renderTeam(){
+  const managers=state.members.filter(m=>m.role==='manager');
+  return `<div class="page-head"><div><h2>${isOwner()?'Team Members':'My Team'}</h2><p>${isOwner()?'Create accounts, assign managers, and manage access.':'Members assigned under your management.'}</p></div>${isOwner()?`<button class="btn btn-primary" onclick="openAddMember()">+ Add Member</button>`:''}</div>
+    <section class="grid stats"><div class="stat"><div class="label">Visible Members</div><div class="value">${state.members.length}</div><div class="meta">Including your account</div></div><div class="stat"><div class="label">Managers</div><div class="value">${state.members.filter(m=>m.role==='manager').length}</div><div class="meta">Active managers</div></div><div class="stat"><div class="label">Sales Members</div><div class="value">${state.members.filter(m=>m.role==='sales').length}</div><div class="meta">Active team members</div></div><div class="stat"><div class="label">Tasks</div><div class="value">${state.tasks.length}</div><div class="meta">Visible task records</div></div></section>
+    <section class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Member</th><th>Employee ID</th><th>Role</th><th>Reports To</th><th>Tasks</th><th>Hours</th><th>Completion</th><th>Actions</th></tr></thead><tbody>${state.members.map(m=>{const mt=state.tasks.filter(t=>t.memberId===m.id),done=mt.filter(t=>t.status==='Completed').length,hours=mt.reduce((s,t)=>s+Number(t.hours||0),0),manager=memberById(m.managerId);return `<tr><td><strong>${esc(m.name)}</strong><br><small>${esc(m.email||'No email')}</small></td><td><strong>${esc(m.employeeId)}</strong></td><td>${rolePill(m.role)}</td><td>${esc(manager?.name||'â€”')}</td><td>${mt.length}</td><td>${hours.toFixed(1)}</td><td>${mt.length?Math.round(done/mt.length*100):0}%</td><td><div class="actions">${m.id!==state.user.id?`<button class="btn btn-light btn-sm" onclick="quickAssign('${m.id}')">Assign Task</button><button class="btn btn-light btn-sm" onclick="ringMember('${m.id}')">Ring</button>${isOwner()?`<button class="btn btn-danger btn-sm" onclick="openEditMember('${m.id}')">Manage</button>`:''}`:'Current user'}</div></td></tr>`}).join('')}</tbody></table></div></section>`;
+}
+function openAddMember(){state.editingMember=null;state.modal='member';renderApp();}
+function openEditMember(id){state.editingMember=state.members.find(m=>m.id===id);state.modal='memberEdit';renderApp();}
+async function createMember(event){event.preventDefault();const f=new FormData(event.target);try{const data=await api('member.create',{method:'POST',body:{name:f.get('name'),email:f.get('email'),role:f.get('role'),employeeId:f.get('employeeId'),pin:f.get('pin'),managerId:f.get('managerId')}});state.modal=null;toast(`Member created: ${data.member.employeeId}`);await loadData(false);}catch(e){toast(e.message,'err')}}
+async function updateMember(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.update',{method:'PATCH',body:{id:state.editingMember.id,name:f.get('name'),email:f.get('email'),managerId:f.get('managerId'),pin:f.get('pin'),active:f.get('active')==='on'}});state.modal=null;toast('Member updated.');await loadData(false);}catch(e){toast(e.message,'err')}}
+function quickAssign(memberId){state.tab='work';renderApp();setTimeout(()=>{const select=document.querySelector('select[name=memberId]');if(select)select.value=memberId;document.querySelector('input[name=title]')?.focus();},0)}
+
+function renderTasks(){
+  let tasks=[...state.tasks];if(state.taskFilterMember!=='all')tasks=tasks.filter(t=>t.memberId===state.taskFilterMember);if(state.taskFilterStatus!=='all')tasks=tasks.filter(t=>t.status===state.taskFilterStatus);
+  return `<div class="page-head"><div><h2>Team Tasks</h2><p>View and update all tasks permitted by your role.</p></div><button class="btn btn-primary" onclick="goTab('work')">+ Assign Task</button></div>
+    <section class="card"><div class="attendance"><div class="field"><label>Member</label><select onchange="state.taskFilterMember=this.value;renderApp()"><option value="all">All Members</option>${state.members.map(m=>`<option value="${m.id}" ${state.taskFilterMember===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div><div class="field"><label>Status</label><select onchange="state.taskFilterStatus=this.value;renderApp()"><option value="all">All Statuses</option>${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`<option ${state.taskFilterStatus===s?'selected':''}>${s}</option>`).join('')}</select></div></div></section>
+    <section class="card">${renderTaskTable(tasks)}</section>`;
+}
+
+function renderRecords(){
+  const records=[...state.attendance]
+    .filter(a=>state.recordMember==='all'||a.memberId===state.recordMember)
+    .sort((a,b)=>b.workDate.localeCompare(a.workDate));
+
+  return `<div class="page-head">
+    <div>
+      <h2>Daily Records</h2>
+      <p>Finished and active work days with attendance and task hours.</p>
+    </div>
+  </div>
+
+  ${canManageTeam()?`
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h3>Daily PDF Report</h3>
+          <p>Select a team member and date, then generate a printable PDF report.</p>
+        </div>
+      </div>
+
+      <div class="attendance">
+        <div class="field">
+          <label>Team Member</label>
+          <select onchange="state.recordMember=this.value;renderApp()">
+            <option value="all">Select Member</option>
+            ${state.members.map(m=>`
+              <option value="${m.id}" ${state.recordMember===m.id?'selected':''}>
+                ${esc(m.name)} — ${esc(m.employeeId)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Report Date</label>
+          <input
+            type="date"
+            value="${esc(state.recordDate||localDate())}"
+            onchange="state.recordDate=this.value"
+          >
+        </div>
+
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="generateDailyPDF()"
+          >
+            Generate PDF
+          </button>
+        </div>
+      </div>
+    </section>
+  `:''}
+
+  ${records.length
+    ?records.map(a=>renderOneDayBlock(a.memberId,a.workDate)).join('')
+    :`<div class="card empty">
+        <div class="emoji">&#128197;</div>
+        No attendance records found.
+      </div>`
+  }
+  `;
+}
+
+async function generateDailyPDF(){
+  const memberId = state.recordMember;
+
+  if(!memberId || memberId === 'all'){
+    toast('Please select a team member first.','err');
+    return;
+  }
+
+  const date = state.recordDate || localDate();
+
+  try {
+    const response = await fetch(
+      `/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
+      {
+        method:'GET',
+        headers:{
+          'Accept':'application/pdf',
+          'Authorization':`Bearer ${state.token}`
+        }
+      }
+    );
+
+    if(!response.ok){
+      let message='Unable to generate PDF.';
+      try{
+        const data=await response.json();
+        message=data.error||message;
+      }catch{}
+      throw new Error(message);
+    }
+
+    const blob=await response.blob();
+
+    if(!blob.size){
+      throw new Error('The PDF file is empty.');
+    }
+
+    const member=memberById(memberId);
+    const safeName=String(member?.name||'Employee')
+      .replace(/[^a-z0-9]+/gi,'-')
+      .replace(/^-+|-+$/g,'');
+
+    const filename=`Daily-Task-Report-${safeName||'Employee'}-${date}.pdf`;
+
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+
+    link.href=url;
+    link.download=filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+
+    toast('PDF downloaded successfully.');
+  }catch(e){
+    toast(e.message||'Unable to generate PDF.','err');
+  }
+}
+function renderOneDayBlock(memberId,date){
+  const a=attendanceFor(memberId,date)||{};const member=memberById(memberId)||{};const tasks=tasksFor(memberId,date);const p=dateParts(date);const hours=tasks.reduce((s,t)=>s+Number(t.hours||0),0);
+  return `<article class="day-block"><header class="day-head"><div class="day-title"><div class="day-num">${esc(p.num)}</div><div><strong>${esc(p.day)} â€” ${esc(member.name||'Member')}</strong><small>${esc(p.month)} Â· ${esc(member.employeeId||'')}</small></div></div><div class="day-meta">Login: <strong>${esc(a.loginTime||'â€”')}</strong> Â· Logout: <strong>${esc(a.logoutTime||'â€”')}</strong> Â· Hours: <strong>${hours.toFixed(1)}</strong></div>${a.finishedAt?`<span class="finished">âœ“ FINISHED DAY</span>`:`<span class="pill p-progress">ACTIVE</span>`}</header><div class="day-body">${renderTaskTable(tasks)}</div></article>`;
+}
+
+function renderZoomSettings(c){
+  return `<section class="card">
+    <div class="card-head">
+      <div>
+        <h3>?? Huddle Video Call</h3>
+        <p>Save the recurring company Zoom Huddle meeting once. Authorized employees can then join directly.</p>
+      </div>
+    </div>
+
+    <form onsubmit="saveZoomHuddle(event)">
+      <div class="field">
+        <label>Zoom Join Meeting URL</label>
+        <input
+          name="zoomHuddleUrl"
+          type="url"
+          value="${esc(c.zoom_huddle_url||'')}"
+          placeholder="https://zoom.us/j/123456789"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Save Zoom URL</button>
+        ${c.zoom_huddle_url ? `
+          <a
+            class="btn btn-green"
+            href="${esc(c.zoom_huddle_url)}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Test Video Call</a>
+        ` : ''}
+      </div>
+    </form>
+
+    ${c.zoom_huddle_url
+      ? `<div class="success">? Recurring Huddle Zoom URL is saved. Employees can use Video Call to join it.</div>`
+      : `<div class="notice">Save the recurring Zoom Huddle Join URL here. Employees will not need to enter it each morning.</div>`
+    }
+  </section>`;
+}
+function renderSettings(){
+  const c=state.company||{};
+  return `<div class="page-head"><div><h2>Owner Settings</h2><p>Shared branding, Google Sheets, and Owner security.</p></div></div>
+    <section class="grid two-col"><div>
+      <section class="card"><div class="card-head"><div><h3>ðŸ¢ Company Branding</h3><p>These settings appear on every device.</p></div></div>
+        <form class="form-grid" onsubmit="saveCompany(event)"><div class="field wide"><label>Company Name</label><input name="name" value="${esc(c.name||'')}"></div><div class="field wide"><label>Tagline</label><input name="tagline" value="${esc(c.tagline||'')}"></div>
+          <div class="field"><label>Primary Color</label><div class="color-row"><input name="primaryColor" type="color" value="${esc(c.primary_color||'#C9A84C')}"><span>${esc(c.primary_color||'')}</span></div></div><div class="field"><label>Header Color</label><div class="color-row"><input name="headerColor" type="color" value="${esc(c.header_color||'#0B1730')}"><span>${esc(c.header_color||'')}</span></div></div><div class="field"><label>Header Gradient</label><div class="color-row"><input name="headerColor2" type="color" value="${esc(c.header_color_2||'#1A3560')}"><span>${esc(c.header_color_2||'')}</span></div></div>
+          <div class="field all"><label>Company Logo (shared)</label><div style="display:flex;gap:15px;align-items:center;flex-wrap:wrap"><div class="logo-preview">${c.logo_data_url?`<img src="${esc(c.logo_data_url)}" alt="logo">`:'No logo'}</div><input id="logoUpload" type="file" accept="image/png,image/jpeg,image/svg+xml" onchange="previewLogo(this)"><button type="button" class="btn btn-danger btn-sm" onclick="clearLogo()">Remove Logo</button></div><input type="hidden" name="logoDataUrl" id="logoDataUrl" value="${esc(c.logo_data_url||'')}"></div>
+          <div class="field all"><button class="btn btn-primary" type="submit">Save Company Settings</button></div></form></section>
+      <section class="card"><div class="card-head"><div><h3>ðŸ” Change My PIN</h3><p>Use 4â€“8 digits and keep it private.</p></div></div><form class="form-grid" onsubmit="changeMyPin(event)"><div class="field"><label>Current PIN</label><input name="currentPin" type="password" inputmode="numeric" required></div><div class="field"><label>New PIN</label><input name="newPin" type="password" inputmode="numeric" required></div><div class="field"><label>&nbsp;</label><button class="btn btn-dark" type="submit">Change PIN</button></div></form></section>
+    </div><div>
+      <section class="card"><div class="card-head"><div><h3>ðŸŸ¢ Automatic Google Sheets Sync</h3><p>Every task is inserted or updated automatically.</p></div></div><form onsubmit="saveSheet(event)"><div class="field"><label>Apps Script Web App URL</label><input name="sheetWebhookUrl" value="${esc(c.sheet_webhook_url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="actions"><button class="btn btn-primary" type="submit">Save URL</button><button class="btn btn-light" type="button" onclick="testSheet()">Test Connection</button><a class="btn btn-green" href="/google-apps-script/Code.gs" download>Download Code.gs</a></div></form>${c.sheet_webhook_url?`<div class="success">Google Sheets URL is saved. Task, attendance, and Finish Day changes sync from the server.</div>`:`<div class="notice">Create a Google Sheet, deploy the included Apps Script as a Web App, then paste its /exec URL here.</div>`}</section>
+      <section class="card"><div class="card-head"><div><h3>ðŸŒ Multi-Device Status</h3><p>This live version does not use localStorage for business data.</p></div></div><div class="success">âœ“ Members, tasks, attendance, finished days, notifications, and branding are stored in Supabase and shared across locations.</div><div class="notice">Vercel Environment Variables must remain configured. Never expose the Supabase secret key in this HTML.</div></section>
+    </div></section>`;
+}
+function previewLogo(input){const file=input.files?.[0];if(!file)return;if(file.size>650000)return toast('Logo must be smaller than about 650 KB.','err');const reader=new FileReader();reader.onload=()=>{document.getElementById('logoDataUrl').value=reader.result;toast('Logo selected. Click Save Company Settings.');};reader.readAsDataURL(file)}
+function clearLogo(){document.getElementById('logoDataUrl').value='';toast('Logo removed from form. Click Save Company Settings.');}
+async function saveCompany(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{name:f.get('name'),tagline:f.get('tagline'),primaryColor:f.get('primaryColor'),headerColor:f.get('headerColor'),headerColor2:f.get('headerColor2'),logoDataUrl:f.get('logoDataUrl')}});toast('Company branding saved for all devices.');await loadData(false);}catch(e){toast(e.message,'err')}}
+async function saveZoomHuddle(event){
+  event.preventDefault();
+
+  const f=new FormData(event.target);
+  const url=String(f.get('zoomHuddleUrl')||'').trim();
+
+  try{
+    await api('company.update',{
+      method:'PATCH',
+      body:{zoomHuddleUrl:url}
+    });
+
+    toast('Zoom Huddle URL saved.');
+    await loadData(false);
+  }catch(e){
+    toast(e.message,'err');
+  }
+}
+async function saveSheet(event){event.preventDefault();const f=new FormData(event.target);try{await api('company.update',{method:'PATCH',body:{sheetWebhookUrl:f.get('sheetWebhookUrl')}});toast('Google Sheets URL saved.');await loadData(false);}catch(e){toast(e.message,'err')}}
+async function testSheet(){try{await api('sheet.test',{method:'POST',body:{}});toast('Google Sheet connection is working.');}catch(e){toast(e.message,'err')}}
+async function changeMyPin(event){event.preventDefault();const f=new FormData(event.target);try{await api('member.selfPin',{method:'PATCH',body:{currentPin:f.get('currentPin'),newPin:f.get('newPin')}});event.target.reset();toast('PIN changed successfully.');}catch(e){toast(e.message,'err')}}
+
+function toggleNotifications(){state.notificationsOpen=!state.notificationsOpen;renderApp();if(state.notificationsOpen&&unreadCount())markNotificationsRead();}
+function renderNotifications(){
+  const items = state.notifications || [];
+
+  let html =
+    '<aside class="notification-panel">' +
+      '<div class="np-head">' +
+        '<strong>Notifications</strong>' +
+        '<button class="btn btn-light btn-sm" type="button" onclick="markNotificationsRead()">Mark all read</button>' +
+      '</div>';
+
+  if(items.length){
+    html += items.map(n =>
+      '<div class="notif ' + (n.readAt ? '' : 'unread') + '">' +
+        '<strong>' +
+          (n.type === 'ring' ? '&#128276;' : n.type === 'task' ? '&#128203;' : '&#8505;') +
+          ' ' +
+          esc(n.message) +
+        '</strong>' +
+        '<time>' + esc(formatDateTime(n.createdAt)) + '</time>' +
+      '</div>'
+    ).join('');
+  }else{
+    html += '<div class="empty">No notifications.</div>';
+  }
+
+  html += '</aside>';
+
+  return html;
+}
+async function markNotificationsRead(){try{await api('notifications.read',{method:'POST',body:{ids:state.notifications.filter(n=>!n.readAt).map(n=>n.id)}});state.notifications.forEach(n=>n.readAt=n.readAt||new Date().toISOString());renderApp();}catch(e){toast(e.message,'err')}}
+function openVideoCall(){
+  const url=String(state.company?.zoom_huddle_url||'').trim();
+
+  if(!url){
+    toast('The Huddle Zoom meeting link has not been saved yet.','err');
+    return;
+  }
+
+  window.open(url,'_blank','noopener,noreferrer');
+}
+function openRing(){state.modal='ring';renderApp();}
+function ringMember(id){state.modal='ring';state.ringRecipient=id;renderApp();}
+async function sendRing(event){event.preventDefault();const f=new FormData(event.target);try{await api('ring',{method:'POST',body:{recipientId:f.get('recipientId'),message:f.get('message')}});state.modal=null;state.ringRecipient=null;toast('Ring sent.');renderApp();}catch(e){toast(e.message,'err')}}
+
+function closeModal(){state.modal=null;state.editingTask=null;state.editingMember=null;state.ringRecipient=null;renderApp();}
+function renderModal(){
+  if(!state.modal)return '';
+  if(state.modal==='task'){
+  const t=state.editingTask;
+  if(!t)return '';
+
+  const draft=state.editTaskDraft||{
+    title:t.title||'',
+    taskDate:t.taskDate||'',
+    priority:t.priority||'Medium',
+    hours:Number(t.hours||0.5),
+    status:t.status||'Pending',
+    notes:t.notes||''
+  };
+
+  const editDurations={
+    High:[
+      {value:4,label:'4 hours'},
+      {value:4.5,label:'4 hours 30 minutes'},
+      {value:5,label:'5 hours'},
+      {value:5.5,label:'5 hours 30 minutes'},
+      {value:6,label:'6 hours'}
+    ],
+    Medium:[
+      {value:0.5,label:'30 minutes'},
+      {value:2/3,label:'40 minutes'},
+      {value:0.75,label:'45 minutes'}
+    ],
+    Low:[
+      {value:0.25,label:'15 minutes'},
+      {value:1/3,label:'20 minutes'},
+      {value:5/12,label:'25 minutes'}
+    ]
+  };
+
+  const durationOptions=editDurations[draft.priority]||editDurations.Medium;
+
+  return modalWrap('Edit Task',`
+    <form onsubmit="updateTask(event)" oninput="saveEditDraft(event)">
+      <div class="field">
+        <label>Task Name</label>
+        <input
+          name="title"
+          value="${esc(draft.title)}"
+          required
+        >
+      </div>
+
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Date</label>
+          <input
+            name="taskDate"
+            type="date"
+            value="${esc(draft.taskDate)}"
+            required
+          >
+        </div>
+
+        <div class="field">
+          <label>Priority</label>
+          <select
+            name="priority"
+            onchange="saveEditDraft(event);updateEditDurationOptions(this)"
+          >
+            ${['High','Medium','Low'].map(p=>`
+              <option value="${p}" ${draft.priority===p?'selected':''}>
+                ${p}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Duration</label>
+          <select name="hours">
+            ${durationOptions.map(o=>`
+              <option
+                value="${o.value}"
+                ${Math.abs(Number(draft.hours)-Number(o.value))<0.000001?'selected':''}
+              >
+                ${o.label}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            ${['Pending','In Progress','Completed','On Hold','Review'].map(s=>`
+              <option ${draft.status===s?'selected':''}>
+                ${s}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+      </div>
+
+      <div class="field">
+        <label>Notes</label>
+        <textarea name="notes">${esc(draft.notes)}</textarea>
+      </div>
+
+      <div class="actions">
+        <button
+          class="btn btn-light"
+          type="button"
+          onclick="closeModal()"
+        >
+          Cancel
+        </button>
+
+        <button
+          class="btn btn-primary"
+          type="submit"
+        >
+          Save Changes
+        </button>
+      </div>
+    </form>
+  `);
+}
+
+function saveEditDraft(event){
+  if(!state.editingTask)return;
+
+  const form=event.target.closest('form');
+  if(!form)return;
+
+  state.editTaskDraft={
+    title:form.elements.title?.value||'',
+    taskDate:form.elements.taskDate?.value||'',
+    priority:form.elements.priority?.value||'Medium',
+    hours:Number(form.elements.hours?.value||0),
+    status:form.elements.status?.value||'Pending',
+    notes:form.elements.notes?.value||''
+  };
+}
+
+function updateEditDurationOptions(select){
+  const form=select.form;
+  const hours=form.elements.hours;
+
+  const options={
+    High:[
+      [4,'4 hours'],
+      [4.5,'4 hours 30 minutes'],
+      [5,'5 hours'],
+      [5.5,'5 hours 30 minutes'],
+      [6,'6 hours']
+    ],
+    Medium:[
+      [0.5,'30 minutes'],
+      [2/3,'40 minutes'],
+      [0.75,'45 minutes']
+    ],
+    Low:[
+      [0.25,'15 minutes'],
+      [1/3,'20 minutes'],
+      [5/12,'25 minutes']
+    ]
+  };
+
+  const selected=options[select.value]||options.Medium;
+
+  hours.innerHTML=selected.map(([value,label])=>
+    `<option value="${value}">${label}</option>`
+  ).join('');
+
+  saveEditDraft({target:form});
+}
+  if(state.modal==='member'){const managers=state.members.filter(m=>m.role==='manager');return modalWrap('Add Team Member',`<form onsubmit="createMember(event)"><div class="form-grid"><div class="field wide"><label>Full Name</label><input name="name" required></div><div class="field wide"><label>Email</label><input name="email" type="email"></div><div class="field"><label>Role</label><select name="role" onchange="document.getElementById('managerField').style.display=this.value==='sales'?'flex':'none'"><option value="sales">Team Member (Sales)</option><option value="manager">Manager</option></select></div><div class="field"><label>Employee ID</label><input name="employeeId" placeholder="Auto-generated if blank"></div><div class="field"><label>PIN</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}" required></div><div class="field" id="managerField"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Create Member</button></div></form>`)}
+  if(state.modal==='memberEdit'){const m=state.editingMember,managers=state.members.filter(x=>x.role==='manager'&&x.id!==m.id);return modalWrap('Manage Member',`<form onsubmit="updateMember(event)"><div class="field"><label>Name</label><input name="name" value="${esc(m.name)}" required></div><div class="field"><label>Email</label><input name="email" type="email" value="${esc(m.email||'')}"></div>${m.role==='sales'?`<div class="field"><label>Reports To</label><select name="managerId"><option value="">No Manager</option>${managers.map(x=>`<option value="${x.id}" ${m.managerId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`:'<input type="hidden" name="managerId" value="">'}<div class="field"><label>New PIN (leave blank to keep current)</label><input name="pin" inputmode="numeric" pattern="[0-9]{4,8}"></div><label style="display:flex;gap:8px;align-items:center;margin:10px 0 18px"><input name="active" type="checkbox" ${m.active?'checked':''}> Active account</label><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Save Member</button></div></form>`)}
+  if(state.modal==='ring'){const recipients=state.members.filter(m=>m.id!==state.user.id);return modalWrap('ðŸ”” Ring Notification',`<form onsubmit="sendRing(event)">${isSales()?`<div class="notice">This ring will be sent directly to the Owner.</div>`:`<div class="field"><label>Ring</label><select name="recipientId" required>${recipients.map(m=>`<option value="${m.id}" ${(state.ringRecipient||'')===m.id?'selected':''}>${esc(m.name)} — ${esc(m.employeeId)}</option>`).join('')}</select></div>`}<div class="field"><label>Message</label><textarea name="message" placeholder="Please check the dashboardâ€¦"></textarea></div><div class="actions"><button type="button" class="btn btn-light" onclick="closeModal()">Cancel</button><button class="btn btn-primary">Send Ring</button></div></form>`)}
+  return '';
+}
+function modalWrap(title,body){
+  var safeTitle = esc(title || '');
+  return '<div class="modal-back" onclick="if(event.target===this)closeModal()">' +
+         '<section class="modal">' +
+         '<div class="modal-head">' +
+         '<h3>' + safeTitle + '</h3>' +
+         '<button class="close" type="button" onclick="closeModal()">&#10005;</button>' +
+         '</div>' +
+         body +
+         '</section>' +
+         '</div>';
+}
+window.addEventListener('DOMContentLoaded',async()=>{if(state.token){try{await loadData();startPolling();}catch{renderLogin();}}else renderLogin();});
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

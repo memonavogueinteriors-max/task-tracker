@@ -1,5 +1,5 @@
--- TEAM TASK TRACKER — SUPABASE DATABASE
--- Run this entire file once in Supabase: SQL Editor → New query → Run
+﻿-- TEAM TASK TRACKER - SUPABASE DATABASE
+-- Run this entire file once in Supabase: SQL Editor -> New query -> Run
 
 create extension if not exists pgcrypto;
 
@@ -12,6 +12,7 @@ create table if not exists public.companies (
   header_color text not null default '#0B1730',
   header_color_2 text not null default '#1A3560',
   sheet_webhook_url text not null default '',
+  google_meet_url text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

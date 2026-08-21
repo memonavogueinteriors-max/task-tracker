@@ -743,18 +743,16 @@ async function handleChatConversations(req, res, db, actor) {
       .neq('sender_id', actor.id);
 
     if (membership?.last_read_at) {
-      query = query.gt(
-        'created_at',
-        membership.last_read_at
-      );
+      query = query.gt('created_at', membership.last_read_at);
     }
 
     const { count, error } = await query;
 
     if (error) throw error;
 
-    unreadByConversation[conversation.id] = Number(count || 0);
+    unreadByConversation[conversation.id] = count || 0;
   }
+
   return send(res, 200, {
     conversations: enrichedConversations,
     members: allowedMembers || [],
@@ -1352,80 +1350,44 @@ async function handleDailyPDF(req, res, db, actor) {
     });
   }
 
-  let memberIds;
-
-  if (memberId === 'all') {
-    /*
-     * "all" is a report filter, not a real member ID.
-     * Owners and managers can generate the combined team report.
-     */
-    if (actor.role !== 'owner' && actor.role !== 'manager') {
-      return send(res, 403, {
-        error: 'Only the Owner or Manager can generate the all-members report.'
-      });
-    }
-
-    memberIds = await allowedMemberIds(db, actor);
-  } else {
-    if (!(await canAccessMember(db, actor, memberId))) {
-      return send(res, 403, {
-        error: 'You cannot access this team member report.'
-      });
-    }
-
-    memberIds = [memberId];
+  if (!(await canAccessMember(db, actor, memberId))) {
+    return send(res, 403, {
+      error: 'You cannot access this team member report.'
+    });
   }
 
-  const memberResults = await Promise.all(
-    memberIds.map(async currentMemberId => {
-      const [
-        { data: member, error: memberError },
-        { data: tasks, error: tasksError },
-        { data: attendance, error: attendanceError }
-      ] = await Promise.all([
-        db
-          .from('members')
-          .select('id,employee_id,name,role')
-          .eq('id', currentMemberId)
-          .eq('company_id', actor.company_id)
-          .single(),
+  const [
+    { data: member, error: memberError },
+    { data: tasks, error: tasksError },
+    { data: attendance, error: attendanceError }
+  ] = await Promise.all([
+    db
+      .from('members')
+      .select('id,employee_id,name,role')
+      .eq('id', memberId)
+      .eq('company_id', actor.company_id)
+      .single(),
 
-        db
-          .from('tasks')
-          .select('id,title,task_date,hours,priority,status,notes')
-          .eq('company_id', actor.company_id)
-          .eq('member_id', currentMemberId)
-          .eq('task_date', date)
-          .order('created_at', { ascending: true }),
+    db
+      .from('tasks')
+      .select('id,title,task_date,hours,priority,status,notes')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('task_date', date)
+      .order('created_at', { ascending: true }),
 
-        db
-          .from('attendance')
-          .select('login_time,logout_time,finished_at')
-          .eq('company_id', actor.company_id)
-          .eq('member_id', currentMemberId)
-          .eq('work_date', date)
-          .maybeSingle()
-      ]);
+    db
+      .from('attendance')
+      .select('login_time,logout_time,finished_at')
+      .eq('company_id', actor.company_id)
+      .eq('member_id', memberId)
+      .eq('work_date', date)
+      .maybeSingle()
+  ]);
 
-      if (memberError) throw memberError;
-      if (tasksError) throw tasksError;
-      if (attendanceError) throw attendanceError;
-
-      return {
-        member,
-        tasks: Array.isArray(tasks) ? tasks : [],
-        attendance
-      };
-    })
-  );
-
-  /*
-   * Keep the existing single-member variables working.
-   * For "all", the PDF renderer below will use memberResults.
-   */
-  const member = memberResults[0]?.member || null;
-  const tasks = memberResults[0]?.tasks || [];
-  const attendance = memberResults[0]?.attendance || null;
+  if (memberError) throw memberError;
+  if (tasksError) throw tasksError;
+  if (attendanceError) throw attendanceError;
 
   const safeTasks = Array.isArray(tasks) ? tasks : [];
 
@@ -1467,15 +1429,11 @@ async function handleDailyPDF(req, res, db, actor) {
     return '';
   };
 
-  const filenameMember =
-    memberId === 'all'
-      ? 'All-Members'
-      : cleanPDFText(member.name || 'Employee')
-          .replace(/[^a-z0-9]+/gi, '-')
-          .replace(/^-+|-+$/g, '');
+  const filenameMember = cleanPDFText(member.name || 'Employee')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
 
-  const filename =
-    `Daily-Task-Report-${filenameMember || 'Employee'}-${date}.pdf`;
+  const filename = `Daily-Task-Report-${filenameMember || 'Employee'}-${date}.pdf`;
 
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/pdf');
@@ -1489,10 +1447,7 @@ async function handleDailyPDF(req, res, db, actor) {
     size: 'A4',
     margin: 40,
     info: {
-      Title:
-        memberId === 'all'
-          ? `Daily Task Report - All Members - ${date}`
-          : `Daily Task Report - ${cleanPDFText(member.name)}`,
+      Title: `Daily Task Report - ${cleanPDFText(member.name)}`,
       Author: 'Vogue Interiors Team Productivity Portal'
     }
   });
@@ -1501,245 +1456,151 @@ async function handleDailyPDF(req, res, db, actor) {
 
   const pageWidth = doc.page.width - 80;
 
-  const renderMemberReport = (report, isFirst) => {
-    if (!isFirst) {
-      doc.addPage();
-    }
+  doc
+    .fontSize(20)
+    .font('Helvetica-Bold')
+    .text('Daily Task Report');
 
-    const reportMember = report.member;
-    const reportTasks = Array.isArray(report.tasks)
-      ? report.tasks
-      : [];
-    const reportAttendance = report.attendance || null;
+  doc.moveDown(0.5);
 
-    const reportTotalHours = reportTasks.reduce(
-      (sum, task) => sum + Number(task.hours || 0),
-      0
-    );
+  doc
+    .fontSize(10)
+    .font('Helvetica')
+    .text(`Employee: ${cleanPDFText(member.name)} (${cleanPDFText(member.employee_id)})`)
+    .text(`Role: ${cleanPDFText(member.role)}`)
+    .text(`Date: ${date}`)
+    .text(`Login: ${attendance?.login_time ? String(attendance.login_time).slice(0, 5) : 'â€”'}`)
+    .text(`Logout: ${attendance?.logout_time ? String(attendance.logout_time).slice(0, 5) : 'â€”'}`)
+    .text(`Day: ${attendance?.finished_at ? 'Finished' : 'Active'}`);
 
-    const reportCompleted = reportTasks.filter(
-      task => task.status === 'Completed'
-    ).length;
+  doc.moveDown(1);
+
+  const summaryY = doc.y;
+  const boxWidth = (pageWidth - 20) / 3;
+
+  [
+    ['Tasks', String(safeTasks.length)],
+    ['Completed', String(completed)],
+    ['Task Time', formatDuration(totalHours)]
+  ].forEach((item, index) => {
+    const x = 40 + index * (boxWidth + 10);
 
     doc
-      .fontSize(20)
+      .rect(x, summaryY, boxWidth, 48)
+      .stroke();
+
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text(item[0], x + 10, summaryY + 9);
+
+    doc
+      .fontSize(14)
       .font('Helvetica-Bold')
-      .fillColor('#000000')
-      .text('Daily Task Report');
+      .text(item[1], x + 10, summaryY + 24);
+  });
 
-    doc.moveDown(0.5);
+  doc.y = summaryY + 65;
 
-    doc
-      .fontSize(10)
-      .font('Helvetica')
-      .text(
-        `Employee: ${cleanPDFText(reportMember?.name || 'Employee')} (${cleanPDFText(reportMember?.employee_id || '')})`
-      )
-      .text(`Role: ${cleanPDFText(reportMember?.role || '')}`)
-      .text(`Date: ${date}`)
-      .text(
-        `Login: ${
-          reportAttendance?.login_time
-            ? String(reportAttendance.login_time).slice(0, 5)
-            : '-'
-        }`
-      )
-      .text(
-        `Logout: ${
-          reportAttendance?.logout_time
-            ? String(reportAttendance.logout_time).slice(0, 5)
-            : '-'
-        }`
-      )
-      .text(
-        `Day: ${
-          reportAttendance?.finished_at
-            ? 'Finished'
-            : 'Active'
-        }`
-      );
+  const columns = [
+    { label: '#', width: 25 },
+    { label: 'Task', width: 185 },
+    { label: 'Priority', width: 65 },
+    { label: 'Duration', width: 60 },
+    { label: 'Status', width: 75 },
+    { label: 'Notes', width: pageWidth - 25 - 185 - 65 - 60 - 75 }
+  ];
 
-    doc.moveDown(1);
+  const rowHeight = 32;
+  let tableY = doc.y;
 
-    const summaryY = doc.y;
-    const boxWidth = (pageWidth - 20) / 3;
+  const drawHeader = () => {
+    let x = 40;
 
-    [
-      ['Tasks', String(reportTasks.length)],
-      ['Completed', String(reportCompleted)],
-      ['Task Time', formatDuration(reportTotalHours)]
-    ].forEach((item, index) => {
-      const x = 40 + index * (boxWidth + 10);
+    doc.fontSize(8).font('Helvetica-Bold');
 
-      doc
-        .rect(x, summaryY, boxWidth, 48)
-        .stroke();
-
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .text(
-          item[0],
-          x + 10,
-          summaryY + 9
-        );
-
-      doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text(
-          item[1],
-          x + 10,
-          summaryY + 24
-        );
-    });
-
-    doc.y = summaryY + 65;
-
-    const columns = [
-      { label: '#', width: 25 },
-      { label: 'Task', width: 185 },
-      { label: 'Priority', width: 65 },
-      { label: 'Duration', width: 60 },
-      { label: 'Status', width: 75 },
-      {
-        label: 'Notes',
-        width:
-          pageWidth -
-          25 -
-          185 -
-          65 -
-          60 -
-          75
-      }
-    ];
-
-    const rowHeight = 32;
-    let tableY = doc.y;
-
-    const drawHeader = () => {
-      let x = 40;
-
-      doc
-        .fontSize(8)
-        .font('Helvetica-Bold');
-
-      columns.forEach(column => {
-        doc
-          .rect(
-            x,
-            tableY,
-            column.width,
-            rowHeight
-          )
-          .stroke();
-
-        doc.text(
-          column.label,
-          x + 4,
-          tableY + 10,
-          {
-            width: column.width - 8,
-            align: 'left'
-          }
-        );
-
-        x += column.width;
-      });
-
-      tableY += rowHeight;
-    };
-
-    const drawRow = (task, taskIndex) => {
-      if (
-        tableY + rowHeight >
-        doc.page.height - 55
-      ) {
-        doc.addPage();
-        tableY = 40;
-        drawHeader();
-      }
-
-      const values = [
-        String(taskIndex + 1),
-        cleanPDFText(task.title),
-        priorityLabel(task.priority),
-        formatDuration(task.hours),
-        cleanPDFText(task.status),
-        cleanPDFText(task.notes) || '-'
-      ];
-
-      let x = 40;
-
-      doc
-        .fontSize(7.5)
-        .font('Helvetica');
-
-      columns.forEach((column, index) => {
-        doc
-          .rect(
-            x,
-            tableY,
-            column.width,
-            rowHeight
-          )
-          .stroke();
-
-        doc.text(
-          values[index],
-          x + 4,
-          tableY + 6,
-          {
-            width: column.width - 8,
-            height: rowHeight - 8,
-            ellipsis: true
-          }
-        );
-
-        x += column.width;
-      });
-
-      tableY += rowHeight;
-    };
-
-    drawHeader();
-
-    if (!reportTasks.length) {
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .text(
-          'No tasks recorded.',
-          44,
-          tableY + 10
-        );
-
-      tableY += rowHeight;
-    } else {
-      reportTasks.forEach(
-        (task, index) =>
-          drawRow(task, index)
-      );
-    }
-
-    doc
-      .fontSize(7)
-      .font('Helvetica')
-      .fillColor('#666666')
-      .text(
-        'Generated from Vogue Interiors Team Productivity Portal.',
-        40,
-        doc.page.height - 35,
+    columns.forEach(column => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+      doc.text(
+        column.label,
+        x + 4,
+        tableY + 10,
         {
-          width: pageWidth
+          width: column.width - 8,
+          align: 'left'
         }
       );
+      x += column.width;
+    });
+
+    tableY += rowHeight;
   };
 
-  memberResults.forEach(
-    (report, index) =>
-      renderMemberReport(report, index === 0)
-  );
+  const drawRow = task => {
+    if (tableY + rowHeight > doc.page.height - 55) {
+      doc.addPage();
+      tableY = 40;
+      drawHeader();
+    }
+
+    const values = [
+      String(safeTasks.indexOf(task) + 1),
+      cleanPDFText(task.title),
+      priorityLabel(task.priority),
+      formatDuration(task.hours),
+      cleanPDFText(task.status),
+      cleanPDFText(task.notes) || 'â€”'
+    ];
+
+    let x = 40;
+
+    doc.fontSize(7.5).font('Helvetica');
+
+    columns.forEach((column, index) => {
+      doc.rect(x, tableY, column.width, rowHeight).stroke();
+
+      doc.text(
+        values[index],
+        x + 4,
+        tableY + 6,
+        {
+          width: column.width - 8,
+          height: rowHeight - 8,
+          ellipsis: true
+        }
+      );
+
+      x += column.width;
+    });
+
+    tableY += rowHeight;
+  };
+
+  drawHeader();
+
+  if (!safeTasks.length) {
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .text('No tasks recorded.', 44, tableY + 10);
+
+    tableY += rowHeight;
+  } else {
+    safeTasks.forEach(drawRow);
+  }
+
+  doc
+    .fontSize(7)
+    .font('Helvetica')
+    .fillColor('#666666')
+    .text(
+      'Generated from Vogue Interiors Team Productivity Portal.',
+      40,
+      doc.page.height - 35,
+      {
+        width: pageWidth
+      }
+    );
 
   doc.end();
 }
