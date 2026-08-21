@@ -737,7 +737,7 @@ async function api(action, options={}) {
 
     const queryString = query.toString();
     const apiUrl =
-      `http://localhost:3001/api?action=${encodeURIComponent(action)}` +
+      `/api?action=${encodeURIComponent(action)}` +
       (queryString ? `&${queryString}` : '');
 
     return fetch(
@@ -2492,7 +2492,7 @@ async function generateDailyPDF(){
 
   try {
     const response = await fetch(
-      `http://localhost:3001/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
+      `/api?action=daily.pdf&memberId=${encodeURIComponent(memberId)}&date=${encodeURIComponent(date)}`,
       {
         method:'GET',
         headers:{
