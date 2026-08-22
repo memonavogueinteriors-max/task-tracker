@@ -2631,6 +2631,59 @@ function renderGoogleMeetSettings(c){
       <section class="card"><div class="card-head"><div><h3>🔐 Change My PIN</h3><p>Use 4–8 digits and keep it private.</p></div></div><form class="form-grid" onsubmit="changeMyPin(event)"><div class="field"><label>Current PIN</label><input name="currentPin" type="password" inputmode="numeric" required></div><div class="field"><label>New PIN</label><input name="newPin" type="password" inputmode="numeric" required></div><div class="field"><label>&nbsp;</label><button class="btn btn-dark" type="submit">Change PIN</button></div></form></section>
     </div><div>
       <section class="card"><div class="card-head"><div><h3>🟢 Automatic Google Sheets Sync</h3><p>Every task is inserted or updated automatically.</p></div></div><form onsubmit="saveSheet(event)"><div class="field"><label>Apps Script Web App URL</label><input name="sheetWebhookUrl" value="${esc(c.sheet_webhook_url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="actions"><button class="btn btn-primary" type="submit">Save URL</button><button class="btn btn-light" type="button" onclick="testSheet()">Test Connection</button><a class="btn btn-green" href="/google-apps-script/Code.gs" download>Download Code.gs</a></div></form>${c.sheet_webhook_url?`<div class="success">Google Sheets URL is saved. Task, attendance, and Finish Day changes sync from the server.</div>`:`<div class="notice">Create a Google Sheet, deploy the included Apps Script as a Web App, then paste its /exec URL here.</div>`}</section>${renderGoogleMeetSettings(c)}
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h3>🔗 Owner Quick Access</h3>
+            <p>Open the company calendars and email accounts directly.</p>
+          </div>
+        </div>
+
+        <div class="actions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+          <a
+            class="btn btn-primary"
+            href="https://calendar.google.com/calendar/u/0/r"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            📅 Vogue Interiors Calendar
+          </a>
+
+          <a
+            class="btn btn-primary"
+            href="https://calendar.google.com/calendar/u/1/r"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            📅 Sunora Calendar
+          </a>
+
+          <a
+            class="btn btn-green"
+            href="https://mail.hostinger.com/auth/login?_user=info%40thevogueinteriorsgroup.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ✉️ info@thevogueinteriorsgroup.com
+          </a>
+
+          <a
+            class="btn btn-green"
+            href="https://mail.hostinger.com/auth/login?_user=sales%40thevogueinteriorsgroup.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ✉️ sales@thevogueinteriorsgroup.com
+          </a>
+        </div>
+
+        <div class="notice" style="margin-top:12px;">
+          Google Calendar will open the selected Google account's calendar.
+          Email buttons open the corresponding Hostinger mailbox login.
+        </div>
+      </section>
+
       <section class="card"><div class="card-head"><div><h3>🌍 Multi-Device Status</h3><p>This live version does not use localStorage for business data.</p></div></div><div class="success">✓ Members, tasks, attendance, finished days, notifications, and branding are stored in Supabase and shared across locations.</div><div class="notice">Vercel Environment Variables must remain configured. Never expose the Supabase secret key in this HTML.</div></section>
     </div></section>`;
 }
