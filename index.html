@@ -592,7 +592,47 @@
     }
 
 
-  </style>
+  <style>
+.quick-dropdown{
+  position:relative;
+  display:inline-block;
+}
+
+.quick-menu{
+  position:absolute;
+  top:calc(100% + 8px);
+  left:0;
+  min-width:190px;
+  padding:8px;
+  background:#fff;
+  border:1px solid rgba(11,23,48,.12);
+  border-radius:10px;
+  box-shadow:0 10px 25px rgba(0,0,0,.15);
+  z-index:9999;
+}
+
+.quick-menu a{
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  padding:11px 14px;
+  margin:0;
+  border-radius:7px;
+  color:#0B1730;
+  background:#fff;
+  text-decoration:none;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+.quick-menu a + a{
+  margin-top:6px;
+}
+
+.quick-menu a:hover{
+  background:#f5f1e7;
+}
+</style>
 </head>
 <body>
   <div id="root"><div class="loading"><div><div class="spinner"></div>Loading tracker…</div></div></div>
