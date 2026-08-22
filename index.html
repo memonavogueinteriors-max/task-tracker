@@ -1665,6 +1665,18 @@ function closeMobileChat(){
 
 function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();if(state.tab==='chat')return renderChat();return renderWork();}
 
+function toggleQuickMenu(menuId){
+  const menu = document.getElementById(menuId);
+  if(!menu)return;
+
+  const shouldOpen = menu.style.display !== 'block';
+
+  document.querySelectorAll('.quick-menu').forEach(m=>{
+    m.style.display='none';
+  });
+
+  menu.style.display = shouldOpen ? 'block' : 'none';
+}
 function renderWork(){
   const date=state.workDate;const mine=tasksFor(state.user.id,date);const attendance=attendanceFor(state.user.id,date);const totalHours=mine.reduce((s,t)=>s+Number(t.hours||0),0);const completed=mine.filter(t=>t.status==='Completed').length;
   const companyTasksToday=state.tasks.filter(t=>t.taskDate===date); const stats=canManageTeam()?[
