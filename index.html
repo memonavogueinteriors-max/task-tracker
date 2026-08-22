@@ -609,6 +609,11 @@
   border-radius:10px;
   box-shadow:0 10px 25px rgba(0,0,0,.15);
   z-index:9999;
+  display:none;
+}
+
+.quick-menu.open{
+  display:block;
 }
 
 .quick-menu a{
@@ -1706,16 +1711,14 @@ function closeMobileChat(){
 function renderCurrentTab(){ if(state.tab==='team'&&canManageTeam())return renderTeam();if(state.tab==='tasks'&&canManageTeam())return renderTasks();if(state.tab==='records')return renderRecords();if(state.tab==='settings'&&isOwner())return renderSettings();if(state.tab==='chat')return renderChat();return renderWork();}
 
 function toggleQuickMenu(menuId){
-  const menu = document.getElementById(menuId);
+  const menu=document.getElementById(menuId);
   if(!menu)return;
 
-  const shouldOpen = menu.style.display !== 'block';
-
   document.querySelectorAll('.quick-menu').forEach(m=>{
-    m.style.display='none';
+    if(m!==menu)m.classList.remove('open');
   });
 
-  menu.style.display = shouldOpen ? 'block' : 'none';
+  menu.classList.toggle('open');
 }
 function renderWork(){
   const date=state.workDate;const mine=tasksFor(state.user.id,date);const attendance=attendanceFor(state.user.id,date);const totalHours=mine.reduce((s,t)=>s+Number(t.hours||0),0);const completed=mine.filter(t=>t.status==='Completed').length;
@@ -1733,11 +1736,11 @@ function renderWork(){
     <div id="calendarMenu" class="quick-menu" style="display:none;">
       <a href="https://calendar.google.com/calendar/u/0/r?authuser=vogueinteriors.dubai@gmail.com"
          target="_blank" rel="noopener noreferrer">
-        Vogue Interiors Calendar
+        Vogue Interiors
       </a>
       <a href="https://calendar.google.com/calendar/u/0/r?authuser=sunorasunpower@gmail.com"
          target="_blank" rel="noopener noreferrer">
-        Sunora Calendar
+        Sunora
       </a>
     </div>
   </div>
@@ -1749,11 +1752,11 @@ function renderWork(){
     <div id="emailMenu" class="quick-menu" style="display:none;">
       <a href="https://mail.hostinger.com/auth/login?_user=info%40thevogueinteriorsgroup.com"
          target="_blank" rel="noopener noreferrer">
-        info@thevogueinteriorsgroup.com
+        Info
       </a>
       <a href="https://mail.hostinger.com/auth/login?_user=sales%40thevogueinteriorsgroup.com"
          target="_blank" rel="noopener noreferrer">
-        sales@thevogueinteriorsgroup.com
+        Sales
       </a>
     </div>
   </div>
