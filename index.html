@@ -1014,13 +1014,24 @@ function canSelectWorkDate(date) {
   if (date < TRACKER_START_DATE) return false;
   if (date > localDate()) return false;
 
-  // Sunday is optional and can always be opened when it is today.
+  // Sunday is optional and can only be opened when it is today.
   if (isSundayDate(date)) {
     return date === localDate();
   }
 
-  // Other dates follow the sequential required-workday rule.
-  return date === getUnlockedWorkDate();
+  // Allow today.
+  if (date === localDate()) {
+    return true;
+  }
+
+  // Allow a previous required workday only when it is unfinished.
+  // This lets a user return and click Finish Day if they forgot.
+  if (!isWorkDateFinished(date)) {
+    return true;
+  }
+
+  // Finished previous workdays remain locked.
+  return false;
 }
 function changeWorkDate(value) {
   const selected = value || localDate();
