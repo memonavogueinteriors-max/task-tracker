@@ -2182,6 +2182,11 @@ function renderHuddleSection(priority) {
                       this.value
                     )
                   "
+                  onkeydown="
+                    if(event.key===' '){
+                      event.stopPropagation();
+                    }
+                  "
                 >
 
               </div>
@@ -2317,17 +2322,11 @@ function renderAddTaskCard() {
 async function saveHuddleTasks(priority) {
 
   if (!['High', 'Medium', 'Low'].includes(priority)) {
-    return toast(
-      'Invalid task priority.',
-      'err'
-    );
+    return toast('Invalid task priority.','err');
   }
 
   if (huddleSaved[priority]) {
-    return toast(
-      `${priority} tasks are already saved.`,
-      'err'
-    );
+    return toast(`${priority} tasks are already saved.`,'err');
   }
 
   ensureHuddleRows(priority);
@@ -2343,55 +2342,39 @@ async function saveHuddleTasks(priority) {
   }
 
   const allowedDurations =
-    huddleDurationOptions(priority)
-      .map(option => Number(option.value));
+    huddleDurationOptions(priority).map(option => Number(option.value));
 
   for (let i = 0; i < rows.length; i++) {
 
     const row = rows[i];
-
-    const title =
-      String(row.title || '').trim();
-
-    const hours =
-      Number(row.hours);
+    const title = String(row.title || '').trim();
+    const hours = Number(row.hours);
 
     if (!title) {
-      return toast(
-        `${priority} Task ${i + 1}: Task name is required.`,
-        'err'
-      );
+      return toast(`${priority} Task ${i + 1}: Task name is required.`,'err');
     }
 
-    if (
-      !allowedDurations.some(
-        value =>
-          Math.abs(value - hours) < 0.000001
-      )
-    ) {
-      return toast(
-        `${priority} Task ${i + 1}: Select a valid duration.`,
-        'err'
-      );
+    if (!allowedDurations.some(value => Math.abs(value - hours) < 0.000001)) {
+      return toast(`${priority} Task ${i + 1}: Select a valid duration.`,'err');
     }
 
-    if (
-      ![
-        'Pending',
-        'In Progress',
-        'Completed',
-        'On Hold',
-        'Review'
-      ].includes(row.status)
-    ) {
-      return toast(
-        `${priority} Task ${i + 1}: Select a valid status.`,
-        'err'
-      );
+    if (!['Pending','In Progress','Completed','On Hold','Review'].includes(row.status)) {
+      return toast(`${priority} Task ${i + 1}: Select a valid status.`,'err');
     }
   }
 
+  const saveButton = document.querySelector(
+    `.huddle-section[data-priority="${priority}"] button[type="submit"],
+     .huddle-section[data-priority="${priority}"] .save-huddle-btn`
+  );
+
   state.busy = true;
+
+  if(saveButton){
+    saveButton.disabled=true;
+    saveButton.dataset.originalText=saveButton.textContent;
+    saveButton.textContent='Saving...';
+  }
 
   try {
 
@@ -2399,21 +2382,18 @@ async function saveHuddleTasks(priority) {
 
     const createdResults = await Promise.all(
       rows.map(row =>
-        api(
-          'task.create',
-          {
-            method: 'POST',
-            body: {
-              memberId: state.user.id,
-              title: String(row.title).trim(),
-              taskDate,
-              hours: Number(row.hours),
-              priority,
-              status: row.status,
-              notes: String(row.notes || '').trim()
-            }
+        api('task.create',{
+          method:'POST',
+          body:{
+            memberId:state.user.id,
+            title:String(row.title).trim(),
+            taskDate,
+            hours:Number(row.hours),
+            priority,
+            status:row.status,
+            notes:String(row.notes || '').trim()
           }
-        )
+        })
       )
     );
 
@@ -2423,45 +2403,42 @@ async function saveHuddleTasks(priority) {
 
     state.tasks = [
       ...state.tasks.filter(
-        task =>
-          !createdTasks.some(
-            created => created.id === task.id
-          )
+        task => !createdTasks.some(created => created.id === task.id)
       ),
       ...createdTasks.map(task => ({
-        id: task.id,
-        companyId: task.company_id,
-        memberId: task.member_id,
-        assignedBy: task.assigned_by,
-        title: task.title,
-        taskDate: task.task_date,
-        hours: Number(task.hours || 0),
-        status: task.status,
-        notes: task.notes || '',
-        priority: task.priority || 'Medium',
-        createdAt: task.created_at,
-        updatedAt: task.updated_at
+        id:task.id,
+        companyId:task.company_id,
+        memberId:task.member_id,
+        assignedBy:task.assigned_by,
+        title:task.title,
+        taskDate:task.task_date,
+        hours:Number(task.hours || 0),
+        status:task.status,
+        notes:task.notes || '',
+        priority:task.priority || 'Medium',
+        createdAt:task.created_at,
+        updatedAt:task.updated_at
       }))
     ];
 
     huddleSaved[priority] = true;
 
-    toast(
-      `${priority} tasks saved successfully.`
-    );
+    state.busy = false;
+
+    toast(`${priority} tasks saved successfully.`);
 
     renderApp();
 
-  } catch (e) {
-
-    toast(
-      e.message,
-      'err'
-    );
-
-  } finally {
+  } catch(e) {
 
     state.busy = false;
+
+    if(saveButton){
+      saveButton.disabled=false;
+      saveButton.textContent=saveButton.dataset.originalText || 'Save';
+    }
+
+    toast(e.message,'err');
 
   }
 }
@@ -2537,13 +2514,51 @@ async function updateTask(event){
     return;
   }
 
+  const saveButton=form.querySelector('button[type="submit"]');
+
   try{
     state.busy=true;
 
-    await api('task.update',{
+    if(saveButton){
+      saveButton.disabled=true;
+      saveButton.dataset.originalText=saveButton.textContent;
+      saveButton.textContent='Saving...';
+    }
+
+    const result=await api('task.update',{
       method:'PATCH',
       body:draft
     });
+
+    const updated=result?.task || result?.data || result;
+
+    const index=state.tasks.findIndex(task=>task.id===draft.id);
+
+    if(index!==-1){
+      state.tasks[index]={
+        ...state.tasks[index],
+        ...(updated && typeof updated==='object'
+          ? {
+              id:updated.id || draft.id,
+              title:updated.title ?? draft.title,
+              taskDate:updated.task_date ?? updated.taskDate ?? draft.taskDate,
+              hours:Number(updated.hours ?? draft.hours),
+              priority:updated.priority ?? draft.priority,
+              status:updated.status ?? draft.status,
+              notes:updated.notes ?? draft.notes,
+              updatedAt:updated.updated_at ?? updated.updatedAt ?? state.tasks[index].updatedAt
+            }
+          : {
+              title:draft.title,
+              taskDate:draft.taskDate,
+              hours:draft.hours,
+              priority:draft.priority,
+              status:draft.status,
+              notes:draft.notes
+            }
+        )
+      };
+    }
 
     state.busy=false;
     state.modal=null;
@@ -2551,12 +2566,17 @@ async function updateTask(event){
     state.editTaskDraft=null;
 
     toast('Task updated successfully.');
+
     renderApp();
 
   }catch(e){
     state.busy=false;
 
-    // KEEP THE MODAL OPEN AND KEEP EVERYTHING THE USER TYPED.
+    if(saveButton){
+      saveButton.disabled=false;
+      saveButton.textContent=saveButton.dataset.originalText || 'Save Changes';
+    }
+
     state.editTaskDraft=draft;
 
     toast(e.message,'err');
