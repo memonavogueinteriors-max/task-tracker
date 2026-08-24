@@ -2143,7 +2143,7 @@ function renderHuddleSection(priority) {
                 <label>Status</label>
 
                 <select
-                  ${saved ? 'disabled' : ''}
+                  ${saved && !row.carriedForward ? 'disabled' : ''}
                   onchange="
                     updateHuddleField(
                       '${priority}',
@@ -2186,7 +2186,7 @@ function renderHuddleSection(priority) {
                   value="${esc(row.title)}"
                   placeholder="Enter task name"
                   autocomplete="off"
-                  ${saved ? 'disabled' : ''}
+                  ${saved && !row.carriedForward ? 'disabled' : ''}
                   oninput="
                     updateHuddleField(
                       '${priority}',
@@ -2209,7 +2209,7 @@ function renderHuddleSection(priority) {
                 <label>Duration</label>
 
                 <select
-                  ${saved ? 'disabled' : ''}
+                  ${saved && !row.carriedForward ? 'disabled' : ''}
                   onchange="
                     updateHuddleField(
                       '${priority}',
@@ -2249,7 +2249,7 @@ function renderHuddleSection(priority) {
                   value="${esc(row.notes)}"
                   placeholder="Optional notes"
                   autocomplete="off"
-                  ${saved ? 'disabled' : ''}
+                  ${saved && !row.carriedForward ? 'disabled' : ''}
                   oninput="
                     updateHuddleField(
                       '${priority}',
