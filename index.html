@@ -974,6 +974,7 @@ async function loadData(show=true){
       notifications:data.notifications
     });
 
+    restoreHuddleSavedState();
     setUnlockedWorkDate();
 
     setBrand();
@@ -1970,6 +1971,12 @@ let huddleSaved = {
   Low: false
 };
 
+let huddleSaving = {
+  High: false,
+  Medium: false,
+  Low: false
+};
+
 function huddleConfig(priority) {
   return HUDDLE_STAGES[priority] || HUDDLE_STAGES.High;
 }
@@ -2208,32 +2215,58 @@ function renderHuddleSection(priority) {
 
                 <label>Duration</label>
 
-                <select
-                  ${saved && !row.carriedForward ? 'disabled' : ''}
-                  onchange="
-                    updateHuddleField(
-                      '${priority}',
-                      ${i},
-                      'hours',
-                      Number(this.value)
-                    )
-                  "
-                >
+                ${
+                  row.carriedForward
+                    ? `
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value="${Number(row.hours || 0)}"
+                        placeholder="Hours"
+                        autocomplete="off"
+                        oninput="
+                          updateHuddleField(
+                            '${priority}',
+                            ${i},
+                            'hours',
+                            Number(this.value)
+                          )
+                        "
+                      >
+                      <small style="display:block;margin-top:5px;opacity:.65;">
+                        Enter actual hours worked.
+                      </small>
+                    `
+                    : `
+                      <select
+                        ${saved ? 'disabled' : ''}
+                        onchange="
+                          updateHuddleField(
+                            '${priority}',
+                            ${i},
+                            'hours',
+                            Number(this.value)
+                          )
+                        "
+                      >
 
-                  ${durationOptions.map(option => `
-                    <option
-                      value="${option.value}"
-                      ${
-                        Number(row.hours) === Number(option.value)
-                          ? 'selected'
-                          : ''
-                      }
-                    >
-                      ${esc(option.label)}
-                    </option>
-                  `).join('')}
+                        ${durationOptions.map(option => `
+                          <option
+                            value="${option.value}"
+                            ${
+                              Number(row.hours) === Number(option.value)
+                                ? 'selected'
+                                : ''
+                            }
+                          >
+                            ${esc(option.label)}
+                          </option>
+                        `).join('')}
 
-                </select>
+                      </select>
+                    `
+                }
 
               </div>
 
@@ -2339,8 +2372,14 @@ async function saveHuddleTasks(priority) {
   }
 
   if (huddleSaved[priority]) {
-    return toast(`${priority} tasks are already saved.`,'err');
+    return toast(`${priority} tasks are already saved.`);
   }
+
+  if (huddleSaving[priority]) {
+    return;
+  }
+
+  huddleSaving[priority] = true;
 
   ensureHuddleRows(priority);
 
@@ -2367,7 +2406,11 @@ async function saveHuddleTasks(priority) {
       return toast(`${priority} Task ${i + 1}: Task name is required.`,'err');
     }
 
-    if (!allowedDurations.some(value => Math.abs(value - hours) < 0.000001)) {
+    if (row.carriedForward) {
+      if (!Number.isFinite(hours) || hours <= 0) {
+        return toast(`${priority} Task ${i + 1}: Enter a valid duration.`,'err');
+      }
+    } else if (!allowedDurations.some(value => Math.abs(value - hours) < 0.000001)) {
       return toast(`${priority} Task ${i + 1}: Select a valid duration.`,'err');
     }
 
@@ -2380,6 +2423,8 @@ async function saveHuddleTasks(priority) {
     `.huddle-section[data-priority="${priority}"] button[type="submit"],
      .huddle-section[data-priority="${priority}"] .save-huddle-btn`
   );
+
+  const huddleSaveBase = `${state.user.id}:${huddleToday()}:${priority}`;
 
   state.busy = true;
 
@@ -2404,7 +2449,8 @@ async function saveHuddleTasks(priority) {
             hours:Number(row.hours),
             priority,
             status:row.status,
-            notes:String(row.notes || '').trim()
+            notes:String(row.notes || '').trim(),
+            huddleSaveId: `${huddleSaveBase}:${i}`
           }
         })
       )
@@ -2435,6 +2481,7 @@ async function saveHuddleTasks(priority) {
     ];
 
     huddleSaved[priority] = true;
+    huddleSaving[priority] = false;
 
     state.busy = false;
 
@@ -2444,6 +2491,7 @@ async function saveHuddleTasks(priority) {
 
   } catch(e) {
 
+    huddleSaving[priority] = false;
     state.busy = false;
 
     if(saveButton){
@@ -3163,6 +3211,12 @@ window.addEventListener('DOMContentLoaded',async()=>{
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 

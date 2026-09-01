@@ -964,6 +964,7 @@ async function handleCreateTask(req, res, db, actor) {
   const status = cleanText(req.body?.status, 30) || 'Pending';
   const notes = cleanText(req.body?.notes, 1500);
   const priority = cleanText(req.body?.priority, 20) || 'Medium';
+  const huddleSaveId = cleanText(req.body?.huddleSaveId, 160);
 
   if (!(await canAssignTo(db, actor, memberId))) return send(res, 403, { error: 'You cannot assign a task to this member.' });
   if (!title) return send(res, 400, { error: 'Task name is required.' });
@@ -1009,6 +1010,21 @@ if (!['Pending', 'In Progress', 'Completed', 'On Hold', 'Review'].includes(statu
     .maybeSingle();
   if (attendance?.finished_at && actor.role === 'sales') return send(res, 409, { error: 'That work day has already been finished.' });
 
+  if (huddleSaveId) {
+    const { data: existingHuddleTask, error: existingHuddleError } = await db
+      .from('tasks')
+      .select('*')
+      .eq('huddle_save_id', huddleSaveId)
+      .eq('company_id', actor.company_id)
+      .maybeSingle();
+
+    if (existingHuddleError) throw existingHuddleError;
+
+    if (existingHuddleTask) {
+      return send(res, 200, { task: existingHuddleTask, alreadyExists: true });
+    }
+  }
+
   const { data, error } = await db.from('tasks').insert({
     company_id: actor.company_id,
     member_id: memberId,
@@ -1018,7 +1034,8 @@ if (!['Pending', 'In Progress', 'Completed', 'On Hold', 'Review'].includes(statu
     hours,
     status,
     notes,
-    priority
+    priority,
+    huddle_save_id: huddleSaveId || null
   }).select('*').single();
   if (error) throw error;
 
@@ -1782,6 +1799,8 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
+
+
 
 
 
