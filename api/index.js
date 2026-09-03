@@ -792,7 +792,7 @@ async function handleBootstrap(res, db, actor) {
       .in('id', memberIds)
       .order('created_at'),
     db.from('tasks')
-      .select('id,company_id,member_id,assigned_by,title,task_date,hours,priority,status,notes,created_at,updated_at')
+      .select('id,company_id,member_id,assigned_by,title,task_date,hours,priority,status,notes,huddle_save_id,created_at,updated_at')
       .eq('company_id', actor.company_id)
       .in('member_id', memberIds)
       .order('task_date', { ascending: false })
@@ -828,6 +828,7 @@ async function handleBootstrap(res, db, actor) {
       priority: task.priority || 'Medium',
       status: task.status,
       notes: task.notes,
+      huddleSaveId: task.huddle_save_id,
       createdAt: task.created_at,
       updatedAt: task.updated_at
     })),
@@ -866,7 +867,7 @@ async function handleCreateMember(req, res, db, actor) {
 
   if (!name) return send(res, 400, { error: 'Member name is required.' });
   if (!['manager', 'sales'].includes(role)) return send(res, 400, { error: 'Role must be Manager or Sales.' });
-  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
+  if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
   if (!employeeId) employeeId = await nextEmployeeId(db, actor.company_id, role);
   if (!/^[A-Z0-9-]{3,40}$/.test(employeeId)) return send(res, 400, { error: 'Employee ID can use letters, numbers, and hyphens.' });
 
@@ -923,7 +924,7 @@ async function handleUpdateMember(req, res, db, actor) {
   if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
   if (req.body?.pin) {
     const pin = cleanText(req.body.pin, 12);
-    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4â€“8 digits.' });
+    if (!/^\d{4,8}$/.test(pin)) return send(res, 400, { error: 'PIN must contain 4–8 digits.' });
     patch.pin_hash = await bcrypt.hash(pin, 10);
   }
   patch.updated_at = new Date().toISOString();
@@ -944,7 +945,7 @@ async function handleSelfPin(req, res, db, actor) {
   const currentPin = cleanText(req.body?.currentPin, 12);
   const newPin = cleanText(req.body?.newPin, 12);
   if (!/^\d{4,8}$/.test(currentPin) || !/^\d{4,8}$/.test(newPin)) {
-    return send(res, 400, { error: 'Both PINs must contain 4â€“8 digits.' });
+    return send(res, 400, { error: 'Both PINs must contain 4–8 digits.' });
   }
   const { data: member, error: readError } = await db.from('members').select('pin_hash').eq('id', actor.id).single();
   if (readError || !member || !(await bcrypt.compare(currentPin, member.pin_hash))) {
@@ -1226,7 +1227,7 @@ async function handleFinishDay(req, res, db, actor) {
   const workDate = cleanText(req.body?.workDate, 10);
 
   if (!(await canAccessMember(db, actor, memberId))) {
-    return send(res, 403, { error: 'You cannot finish this memberâ€™s day.' });
+    return send(res, 403, { error: 'You cannot finish this member’s day.' });
   }
 
   if (actor.role === 'sales' && memberId !== actor.id) {
@@ -1467,8 +1468,8 @@ async function handleDailyPDF(req, res, db, actor) {
 
   const cleanPDFText = value => {
     return String(value ?? '')
-      .replace(/&mdash;/gi, 'â€”')
-      .replace(/&ndash;/gi, 'â€“')
+      .replace(/&mdash;/gi, '—')
+      .replace(/&ndash;/gi, '–')
       .replace(/&amp;/gi, '&')
       .replace(/<[^>]*>/g, '')
       .trim();
@@ -1774,6 +1775,7 @@ module.exports = async function handler(req, res) {
     if (!actor) return send(res, 401, { error: 'Your login has expired. Please sign in again.' });
 
     if (action === 'bootstrap' && req.method === 'GET') return await handleBootstrap(res, db, actor);
+
     if (action === 'chat.conversations' && req.method === 'GET') return await handleChatConversations(req, res, db, actor);
     if (action === 'chat.open' && req.method === 'POST') return await handleChatOpen(req, res, db, actor);
     if (action === 'chat.messages' && req.method === 'GET') return await handleChatMessages(req, res, db, actor);
@@ -1799,21 +1801,3 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: String(error?.message || error), detail: error?.code || error?.details || error?.hint || undefined });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
