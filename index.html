@@ -2208,55 +2208,32 @@ function renderHuddleSection(priority) {
 
                 <label>Duration</label>
 
-                ${
-                  row.carriedForward
-                    ? `
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value="${Number(row.hours || 0)}"
-                        placeholder="Actual hours"
-                        title="Enter actual hours worked"
-                        oninput="
-                          updateHuddleField(
-                            '${priority}',
-                            ${i},
-                            'hours',
-                            Number(this.value)
-                          )
-                        "
-                      >
-                    `
-                    : `
-                      <select
-                        ${saved ? 'disabled' : ''}
-                        onchange="
-                          updateHuddleField(
-                            '${priority}',
-                            ${i},
-                            'hours',
-                            Number(this.value)
-                          )
-                        "
-                      >
+                <select
+                  ${saved && !row.carriedForward ? 'disabled' : ''}
+                  onchange="
+                    updateHuddleField(
+                      '${priority}',
+                      ${i},
+                      'hours',
+                      Number(this.value)
+                    )
+                  "
+                >
 
-                        ${durationOptions.map(option => `
-                          <option
-                            value="${option.value}"
-                            ${
-                              Number(row.hours) === Number(option.value)
-                                ? 'selected'
-                                : ''
-                            }
-                          >
-                            ${esc(option.label)}
-                          </option>
-                        `).join('')}
+                  ${durationOptions.map(option => `
+                    <option
+                      value="${option.value}"
+                      ${
+                        Number(row.hours) === Number(option.value)
+                          ? 'selected'
+                          : ''
+                      }
+                    >
+                      ${esc(option.label)}
+                    </option>
+                  `).join('')}
 
-                      </select>
-                    `
-                }
+                </select>
 
               </div>
 
